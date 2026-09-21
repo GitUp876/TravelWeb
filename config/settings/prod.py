@@ -38,3 +38,10 @@ EMAIL_PORT = int(env("DJANGO_EMAIL_PORT", "587"))
 EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = True
+
+SITE_BASE_URL = (env("SITE_BASE_URL") or f"https://{ALLOWED_HOSTS[0]}").rstrip("/")
+
+# Half-configured payments would let a guest reach a checkout we cannot
+# confirm, so refuse to boot rather than take money we cannot account for.
+if bool(STRIPE_SECRET_KEY) != bool(STRIPE_WEBHOOK_SECRET):  # noqa: F405
+    raise RuntimeError("Set both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET, or neither")

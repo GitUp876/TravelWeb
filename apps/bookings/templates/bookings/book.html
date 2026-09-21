@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Book {{ trip.title }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+  <p class="breadcrumb"><a href="{{ departure.get_absolute_url }}">Back to this date</a></p>
+  <h1>Book {{ trip.title }}</h1>
+  <p class="lede">
+    {{ departure.start_date|date:'l j F Y' }}{% if departure.duration_days > 1 %} – {{ departure.end_date|date:'l j F Y' }}{% endif %}
+    · {{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} left
+  </p>
+
+  <form method="get" class="party-form">
+    <label for="party">How many are travelling?</label>
+    <select name="party" id="party">
+      {% for size in party_choices %}
+        <option value="{{ size }}" {% if size == party %}selected{% endif %}>{{ size }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Update</button>
+  </form>
+
+  <form method="post" action="?party={{ party }}" class="booking-form">
+    {% csrf_token %}
+
+    <fieldset>
+      <legend>Your details</legend>
+      {{ guest_form.as_p }}
+    </fieldset>
+
+    {% for form in traveller_forms %}
+      <fieldset>
+        <legend>Traveller {{ forloop.counter }}</legend>
+        {{ form.as_p }}
+      </fieldset>
+    {% endfor %}
+
+    <p class="note">
+      The next page is Stripe's secure checkout. Your card details go straight to
+      Stripe and are never seen by this website.
+    </p>
+    <button type="submit" class="primary">Continue to payment</button>
+  </form>
+{% endblock %}

@@ -23,12 +23,20 @@
   </header>
 
   <main id="main" class="wrap">
+    {% if messages %}
+      <ul class="messages" role="status">
+        {% for message in messages %}
+          <li class="message message-{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 
   <footer class="site-footer">
     <div class="wrap">
       <p>{{ site_name }} — {{ site_tagline }}</p>
+      <p><a href="{% url 'bookings:find' %}">Find your booking</a></p>
     </div>
   </footer>
 </body>

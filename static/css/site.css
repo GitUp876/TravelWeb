@@ -94,3 +94,49 @@ table.prices td { text-align: right; font-variant-numeric: tabular-nums; }
 .breadcrumb { font-size: .9rem; margin-bottom: .5rem; }
 
 .site-footer { border-top: 1px solid var(--line); padding-block: 1.5rem; color: var(--ink-soft); font-size: .9rem; }
+
+/* --- Booking flow --- */
+
+.messages { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.message {
+  padding: .7rem 1rem; border-radius: var(--radius); margin-bottom: .5rem;
+  border: 1px solid var(--line); background: #fff;
+}
+.message-error { background: var(--stop-soft); border-color: var(--stop); color: var(--stop); }
+.message-success { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.party-form { display: flex; gap: .5rem; align-items: center; margin: 1.5rem 0; }
+.party-form label { font-weight: 600; }
+
+.booking-form { max-width: 34rem; }
+.booking-form fieldset {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 1rem 1.25rem; margin: 0 0 1.25rem;
+}
+.booking-form legend { font-weight: 700; padding: 0 .4rem; }
+.booking-form p { margin: 0 0 1rem; }
+.booking-form label { display: block; font-weight: 600; margin-bottom: .2rem; }
+.booking-form input[type="text"],
+.booking-form input[type="email"],
+.booking-form input[type="tel"],
+.booking-form select {
+  width: 100%; padding: .5rem .6rem; border: 1px solid var(--line);
+  border-radius: 6px; font: inherit; background: #fff; color: var(--ink);
+}
+.booking-form input[type="checkbox"] { margin-right: .4rem; }
+.booking-form .helptext { display: block; font-size: .85rem; color: var(--ink-soft); margin-top: .2rem; }
+.booking-form ul.errorlist {
+  list-style: none; padding: 0; margin: 0 0 .4rem; color: var(--stop); font-size: .9rem;
+}
+
+button, .button {
+  font: inherit; padding: .6rem 1.1rem; border-radius: 6px;
+  border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer;
+}
+button.primary, .button.primary {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  text-decoration: none; display: inline-block; font-weight: 600;
+}
+
+.travellers { list-style: none; padding: 0; }
+.travellers li { border-bottom: 1px solid var(--line); padding: .7rem 0; }
