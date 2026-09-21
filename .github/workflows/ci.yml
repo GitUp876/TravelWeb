@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tours
+          POSTGRES_PASSWORD: tours
+          POSTGRES_DB: tours
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://tours:tours@localhost:5432/tours
+      # Not a real secret: long enough only to satisfy check --deploy in CI.
+      DJANGO_SECRET_KEY: ci-ephemeral-key-7Qn4vZt2Lp9RmXe6Ub3Kd5Yw8Sa1Hj0Fg2Nc4Vx7Zq
+      DJANGO_ALLOWED_HOSTS: localhost,testserver
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements/dev.txt
+      - name: Lint
+        run: ruff check .
+      - name: Format check
+        run: ruff format --check .
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+      - name: Django deployment checks
+        run: python manage.py check --deploy --fail-level WARNING
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_ADMIN_URL: ci-only-path/
+          DJANGO_SECURE_SSL_REDIRECT: "true"
+      - name: Tests
+        run: pytest
+      - name: Static analysis
+        run: bandit -c pyproject.toml -r apps config -ll
+      - name: Dependency audit
+        run: pip-audit -r requirements/base.txt
