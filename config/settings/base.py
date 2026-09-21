@@ -1,0 +1,191 @@
+"""Settings shared by every environment.
+
+Anything that differs between a laptop and production lives in dev.py / prod.py.
+Nothing secret is ever hard-coded here; secrets come from the environment.
+"""
+
+from pathlib import Path
+
+import dj_database_url
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+
+def env(name: str, default: str | None = None) -> str | None:
+    import os
+
+    return os.environ.get(name, default)
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    raw = env(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    return [item.strip() for item in (env(name, default) or "").split(",") if item.strip()]
+
+
+# --- Core ------------------------------------------------------------------
+
+SECRET_KEY = env("DJANGO_SECRET_KEY", "insecure-development-key-do-not-use")
+DEBUG = False
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
+
+INSTALLED_APPS = [
+    "apps.core.admin_config.StaffAdminConfig",  # replaces django.contrib.admin
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.humanize",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_static",
+    "axes",
+    "apps.core",
+    "apps.accounts",
+    "apps.catalog",
+    "apps.bookings",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.SecurityHeadersMiddleware",
+    "axes.middleware.AxesMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.site",
+            ],
+        },
+    },
+]
+
+# --- Database --------------------------------------------------------------
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=env("DATABASE_URL", "sqlite:///db.sqlite3"),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Authentication --------------------------------------------------------
+
+AUTH_USER_MODEL = "accounts.User"
+
+# AxesStandaloneBackend must come first so lockouts are enforced before any
+# password is checked.
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+LOGIN_URL = "admin:login"
+
+# Staff sessions end after inactivity and are not kept across browser restarts.
+SESSION_COOKIE_AGE = 60 * 60 * 8
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False  # the template tag needs to read it
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# --- Brute-force protection (django-axes) ----------------------------------
+
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
+AXES_RESET_ON_SUCCESS = True
+AXES_ENABLE_ACCESS_FAILURE_LOG = True
+
+# --- Internationalisation --------------------------------------------------
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = env("DJANGO_TIME_ZONE", "America/New_York")
+USE_I18N = True
+USE_TZ = True
+
+# --- Static and media ------------------------------------------------------
+
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
+
+# --- Email -----------------------------------------------------------------
+
+EMAIL_BACKEND = env("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", "bookings@example.com")
+
+# --- Site ------------------------------------------------------------------
+
+SITE_NAME = env("SITE_NAME", "Group Tours")
+SITE_TAGLINE = env("SITE_TAGLINE", "Escorted trips, day tours and getaways")
+ADMIN_URL = env("DJANGO_ADMIN_URL", "staff/")
+
+# How long a booking may hold seats before they are released back to the pool.
+SEAT_HOLD_MINUTES = int(env("SEAT_HOLD_MINUTES", "20"))
+
+# --- Logging ---------------------------------------------------------------
+# Personal data must never reach the logs, so no request bodies are logged.
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+    },
+    "root": {"handlers": ["console"], "level": env("DJANGO_LOG_LEVEL", "INFO")},
+    "loggers": {
+        "django.security": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "axes": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}

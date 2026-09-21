@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero">
+    <h1>{{ site_name }}</h1>
+    <p class="lede">{{ site_tagline }}</p>
+  </section>
+
+  <section>
+    <h2>Next departures</h2>
+    {% if featured %}
+      <div class="grid">
+        {% for departure in featured %}
+          {% include "catalog/_departure_card.html" %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">No dates are open for booking just yet. Please check back soon.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Browse by type</h2>
+    <ul class="category-list">
+      {% for category in categories %}
+        <li>
+          <a href="{% url 'catalog:category' category.value %}">{{ category.label }}</a>
+          <span class="count">{{ category.trip_count }} trip{{ category.trip_count|pluralize }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endblock %}

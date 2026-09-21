@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ departure.trip.title }}, {{ departure.start_date|date:'j M Y' }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+  <article>
+    <p class="breadcrumb"><a href="{{ departure.trip.get_absolute_url }}">{{ departure.trip.title }}</a></p>
+    <h1>{{ departure.start_date|date:'j F Y' }}{% if departure.duration_days > 1 %} – {{ departure.end_date|date:'j F Y' }}{% endif %}</h1>
+    <p class="lede">{{ departure.trip.summary }}</p>
+
+    <h2>Prices per person</h2>
+    <table class="prices">
+      <thead><tr><th scope="col">Option</th><th scope="col">Price</th></tr></thead>
+      <tbody>
+        {% for option in departure.price_options.all %}
+          {% if option.is_available %}
+            <tr>
+              <th scope="row">{{ option.label }}{% if option.description %} <span class="meta">{{ option.description }}</span>{% endif %}</th>
+              <td>${{ option.amount|floatformat:2 }}</td>
+            </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Pickup points</h2>
+    {% if departure.pickups.all %}
+      <ul class="pickups">
+        {% for pickup in departure.pickups.all %}
+          <li>
+            <strong>{{ pickup.pickup_point.name }}</strong>, {{ pickup.pickup_point.city }}
+            — boards {{ pickup.boarding_time|time:'g:i a' }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">Pickup points for this date are still being confirmed.</p>
+    {% endif %}
+
+    <h2>Booking</h2>
+    <p class="availability">
+      {% if departure.is_sold_out %}
+        <span class="tag tag-full">Sold out</span>
+      {% else %}
+        <span class="tag tag-open">{{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} available</span>
+      {% endif %}
+    </p>
+    {% if departure.payment_plan_available %}
+      <p>A payment plan is available on this date: ${{ departure.deposit_amount|floatformat:2 }}
+        today, then equal instalments finishing {{ departure.final_payment_due_date|date:'j F Y' }}.</p>
+    {% endif %}
+    <p class="note">Online booking opens in the next release. Call us to reserve a seat in the meantime.</p>
+
+    {% if departure.cancellation_policy %}
+      <h2>Cancellation policy</h2>
+      <div class="prose">{{ departure.cancellation_policy|linebreaks }}</div>
+    {% endif %}
+  </article>
+{% endblock %}

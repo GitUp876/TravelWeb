@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ trip.title }} — {{ site_name }}{% endblock %}
+{% block description %}{{ trip.summary }}{% endblock %}
+
+{% block content %}
+  <article>
+    <h1>{{ trip.title }}</h1>
+    <p class="lede">{{ trip.summary }}</p>
+
+    {% if trip.hero_image %}
+      <img class="hero-image" src="{{ trip.hero_image.url }}" alt="{{ trip.title }}">
+    {% endif %}
+
+    <div class="prose">{{ trip.description|linebreaks }}</div>
+
+    {% if trip.itinerary_days.all %}
+      <h2>Itinerary</h2>
+      <ol class="itinerary">
+        {% for day in trip.itinerary_days.all %}
+          <li>
+            <h3>Day {{ day.day_number }}: {{ day.title }}</h3>
+            {{ day.description|linebreaks }}
+          </li>
+        {% endfor %}
+      </ol>
+    {% endif %}
+
+    {% if trip.inclusion_lines %}
+      <h2>What's included</h2>
+      <ul>{% for item in trip.inclusion_lines %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if trip.exclusion_lines %}
+      <h2>Not included</h2>
+      <ul>{% for item in trip.exclusion_lines %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    <h2>Dates</h2>
+    {% if departures %}
+      <div class="grid">
+        {% for departure in departures %}
+          {% include "catalog/_departure_card.html" %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">No dates on sale at the moment.</p>
+    {% endif %}
+  </article>
+{% endblock %}

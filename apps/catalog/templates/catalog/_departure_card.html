@@ -1,0 +1,27 @@
+<article class="card">
+  <h3><a href="{{ departure.get_absolute_url }}">{{ departure.trip.title }}</a></h3>
+  <p class="meta">
+    <time datetime="{{ departure.start_date|date:'Y-m-d' }}">{{ departure.start_date|date:'j M Y' }}</time>
+    {% if departure.duration_days > 1 %}
+      – <time datetime="{{ departure.end_date|date:'Y-m-d' }}">{{ departure.end_date|date:'j M Y' }}</time>
+      · {{ departure.duration_days }} days
+    {% endif %}
+    {% if departure.trip.meals_included %} · {{ departure.trip.meals_included }} meals{% endif %}
+  </p>
+  <p>{{ departure.trip.summary }}</p>
+  <p class="price">
+    {% if departure.lead_price %}From ${{ departure.lead_price|floatformat:2 }} per person{% endif %}
+  </p>
+  <p class="availability">
+    {% if departure.is_sold_out %}
+      <span class="tag tag-full">Sold out</span>
+    {% elif departure.seats_available <= 5 %}
+      <span class="tag tag-low">{{ departure.seats_available }} seats left</span>
+    {% else %}
+      <span class="tag tag-open">Seats available</span>
+    {% endif %}
+    {% if departure.payment_plan_available %}
+      <span class="tag tag-plan">Payment plan available</span>
+    {% endif %}
+  </p>
+</article>

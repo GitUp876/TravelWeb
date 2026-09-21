@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}{{ category_label }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+  <h1>{{ category_label }}</h1>
+  {% if trips %}
+    <div class="grid">
+      {% for trip in trips %}
+        <article class="card">
+          <h2><a href="{{ trip.get_absolute_url }}">{{ trip.title }}</a></h2>
+          <p>{{ trip.summary }}</p>
+          <p class="meta">
+            {{ trip.departure_count }} date{{ trip.departure_count|pluralize }} available
+            {% if trip.next_departure %}· next {{ trip.next_departure|date:'j M Y' }}{% endif %}
+          </p>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">Nothing on sale in this category right now.</p>
+  {% endif %}
+{% endblock %}
