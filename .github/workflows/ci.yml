@@ -33,6 +33,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          # Our requirements live in requirements/, so the default glob
+          # (**/requirements.txt) matches nothing and setup-python fails the
+          # job before it installs anything.
+          cache-dependency-path: requirements/*.txt
       - run: pip install -r requirements/dev.txt
       - name: Lint
         run: ruff check .
