@@ -11,19 +11,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: tours
-          POSTGRES_PASSWORD: tours
-          POSTGRES_DB: tours
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
+    # No database service: the test settings use an in-memory SQLite database
+    # and the deployment check never opens a connection, so a Postgres
+    # container would only add startup time. Production runs on Postgres.
     env:
-      DATABASE_URL: postgres://tours:tours@localhost:5432/tours
       # Not a real secret: long enough only to satisfy check --deploy in CI.
       DJANGO_SECRET_KEY: ci-ephemeral-key-7Qn4vZt2Lp9RmXe6Ub3Kd5Yw8Sa1Hj0Fg2Nc4Vx7Zq
       DJANGO_ALLOWED_HOSTS: localhost,testserver
