@@ -71,8 +71,13 @@ class BookingQuerySet(models.QuerySet):
         )
 
     def outstanding(self):
-        return self.filter(status=Booking.Status.CONFIRMED).exclude(
-            amount_paid=models.F("total_amount")
+        """Confirmed bookings that still owe money.
+
+        Compared rather than excluded on equality, so a booking that has somehow
+        been overpaid does not read as one still to chase.
+        """
+        return self.filter(
+            status=Booking.Status.CONFIRMED, amount_paid__lt=models.F("total_amount")
         )
 
 

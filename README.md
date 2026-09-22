@@ -63,6 +63,12 @@ Built in phase 3 so far:
   because that file gets emailed on, and every download is written to the audit
   trail.
 
+- Paying a balance online. A guest whose booking still owes money can settle it
+  from their own booking page, on Stripe's hosted checkout like every other
+  payment. The amount is the balance this database holds, so nothing posted with
+  the form can change what is charged, and paying it stands down any instalments
+  the booking's plan was still going to collect.
+
 That completes the phase 3 scope.
 
 ## How paying works
@@ -170,6 +176,15 @@ apps/payments/       the Stripe gateway, checkout, webhook and event log
   hosted checkout; the only card fields here are brand and last four digits,
   for staff recognition. Adding a card number field would move the site out of
   PCI SAQ A.
+- **A guest may only pay what the server says they owe.** The balance checkout
+  is a POST from the booking page and its amount comes from the booking's own
+  total; no field in the request is read for it. Only a confirmed booking with
+  money outstanding can open one, and money arriving for a booking that was
+  cancelled meanwhile is recorded and logged rather than quietly confirming it.
+- **Nothing may be collected twice.** Paying a balance — online or by a cheque
+  staff record — cancels the instalments still scheduled against it, and the
+  instalment charger refuses a booking whose balance is already clear. Both
+  sides of that are tested.
 - **Instalments charge a saved card, never a stored one.** The card for a
   payment plan is saved by Stripe at the deposit checkout
   (`setup_future_usage='off_session'`); we keep only the Stripe customer and

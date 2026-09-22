@@ -19,6 +19,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from apps.bookings.models import Booking, Payment, PaymentPlan, ScheduledPayment
@@ -128,6 +129,27 @@ def cancel_plan(booking: Booking) -> None:
     if plan.status == PaymentPlan.Status.ACTIVE:
         plan.status = PaymentPlan.Status.CANCELLED
         plan.save(update_fields=["status"])
+
+
+@transaction.atomic
+def settle_plan(booking: Booking) -> None:
+    """Closes a plan whose balance has been paid off in one go.
+
+    Every instalment still waiting or flagged is cancelled, because the money it
+    was going to collect has already arrived. Leaving them scheduled would let
+    the off-session charger take it a second time, which is the one mistake a
+    guest never forgives.
+    """
+    plan = _plan_for(booking)
+    if plan is None:
+        return
+    plan.instalments.filter(
+        status__in=(ScheduledPayment.Status.SCHEDULED, ScheduledPayment.Status.FAILED)
+    ).update(status=ScheduledPayment.Status.CANCELLED)
+    if plan.status in (PaymentPlan.Status.ACTIVE, PaymentPlan.Status.FAILED):
+        plan.status = PaymentPlan.Status.COMPLETED
+        plan.save(update_fields=["status"])
+    logger.info("Settled the plan on booking %s: the balance is paid", booking.reference)
 
 
 def _plan_for(booking: Booking) -> PaymentPlan | None:
@@ -285,6 +307,9 @@ def due_instalments(today: date | None = None):
             due_date__lte=today,
             plan__status=PaymentPlan.Status.ACTIVE,
             plan__booking__status=Booking.Status.CONFIRMED,
+            # Whatever paid the balance off — the guest online, a cheque taken by
+            # staff — there is nothing left to collect on this booking.
+            plan__booking__amount_paid__lt=F("plan__booking__total_amount"),
         )
         .select_related("plan", "plan__booking", "plan__booking__guest")
         .order_by("due_date", "pk")
@@ -309,6 +334,13 @@ def charge_instalment(scheduled_payment: ScheduledPayment) -> bool:
         or not plan.stripe_payment_method_id
     ):
         logger.warning("Skipping instalment %s: booking not armed for charging", sp.pk)
+        return False
+
+    if booking.balance <= 0:
+        # The balance was cleared after this row was picked up. Settling the plan
+        # is the right answer, not a charge for money that is already in.
+        logger.info("Instalment %s is no longer owed; settling the plan", sp.pk)
+        settle_plan(booking)
         return False
 
     sp.attempt_count = sp.attempt_count + 1

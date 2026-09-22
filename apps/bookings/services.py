@@ -182,6 +182,13 @@ def record_offline_payment(
         locked.hold_expires_at = None
         fields += ["status", "confirmed_at", "hold_expires_at"]
     locked.save(update_fields=fields)
+
+    if locked.balance <= 0:
+        # Money taken by hand can clear the balance just as a card can, and the
+        # instalments waiting on it must stand down either way.
+        from apps.payments import plans
+
+        plans.settle_plan(locked)
     return payment
 
 
