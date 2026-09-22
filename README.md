@@ -39,10 +39,17 @@ Built in phase 3 so far:
   the card; instalments are then charged off-session on their due dates. No card
   detail reaches this application at any point.
 
+- The payments-due report. A staff page inside the admin
+  (`reports/payments-due/`, linked from the admin header) showing overdue
+  instalments, what falls due in the next stretch, and confirmed bookings that
+  still owe money with nothing scheduled to collect it, each with a total. It is
+  read-only and needs the `bookings.view_scheduledpayment` permission on top of
+  the admin's usual MFA.
+
 Not built yet, by design:
 
-- Trip manifests, the payments-due report, phone bookings and offline payments
-  are the remaining phase 3 work.
+- Trip manifests, phone bookings and offline payments are the remaining phase 3
+  work.
 
 ## How paying works
 

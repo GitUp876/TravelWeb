@@ -1,0 +1,105 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h1>Payments due</h1>
+  <p class="help">As at {{ as_of|date:'j F Y' }}. Upcoming covers the next
+    {{ horizon_days }} day{{ horizon_days|pluralize }}, to {{ horizon_end|date:'j F Y' }}.</p>
+
+  <form method="get" style="margin-bottom:1em">
+    <label for="days">Look ahead</label>
+    <input type="number" name="days" id="days" min="1" max="365" value="{{ horizon_days }}">
+    <button type="submit">Update</button>
+  </form>
+
+  <h2>Overdue — ${{ overdue_total|floatformat:2 }}</h2>
+  {% if overdue %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Due</th>
+          <th scope="col">Booking</th>
+          <th scope="col">Guest</th>
+          <th scope="col">Departure</th>
+          <th scope="col">Amount</th>
+          <th scope="col">State</th>
+          <th scope="col">Attempts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for instalment in overdue %}
+          <tr>
+            <td>{{ instalment.due_date|date:'j M Y' }}</td>
+            <td><a href="{% url 'admin:bookings_booking_change' instalment.plan.booking.pk %}">{{ instalment.plan.booking.reference }}</a></td>
+            <td>{{ instalment.plan.booking.guest.full_name }}</td>
+            <td>{{ instalment.plan.booking.departure }}</td>
+            <td>${{ instalment.amount|floatformat:2 }}</td>
+            <td>{{ instalment.get_status_display }}</td>
+            <td>{{ instalment.attempt_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Nothing overdue.</p>
+  {% endif %}
+
+  <h2>Due in the next {{ horizon_days }} day{{ horizon_days|pluralize }} — ${{ upcoming_total|floatformat:2 }}</h2>
+  {% if upcoming %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Due</th>
+          <th scope="col">Booking</th>
+          <th scope="col">Guest</th>
+          <th scope="col">Departure</th>
+          <th scope="col">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for instalment in upcoming %}
+          <tr>
+            <td>{{ instalment.due_date|date:'j M Y' }}</td>
+            <td><a href="{% url 'admin:bookings_booking_change' instalment.plan.booking.pk %}">{{ instalment.plan.booking.reference }}</a></td>
+            <td>{{ instalment.plan.booking.guest.full_name }}</td>
+            <td>{{ instalment.plan.booking.departure }}</td>
+            <td>${{ instalment.amount|floatformat:2 }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Nothing due in this window.</p>
+  {% endif %}
+
+  <h2>Balances with no plan — ${{ unplanned_total|floatformat:2 }}</h2>
+  <p class="help">Confirmed bookings that still owe money and have nothing
+    scheduled to collect it. These need chasing by hand.</p>
+  {% if unplanned %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Departs</th>
+          <th scope="col">Booking</th>
+          <th scope="col">Guest</th>
+          <th scope="col">Total</th>
+          <th scope="col">Paid</th>
+          <th scope="col">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for booking in unplanned %}
+          <tr>
+            <td>{{ booking.departure.start_date|date:'j M Y' }}</td>
+            <td><a href="{% url 'admin:bookings_booking_change' booking.pk %}">{{ booking.reference }}</a></td>
+            <td>{{ booking.guest.full_name }}</td>
+            <td>${{ booking.total_amount|floatformat:2 }}</td>
+            <td>${{ booking.amount_paid|floatformat:2 }}</td>
+            <td>${{ booking.balance|floatformat:2 }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Every confirmed booking is either paid or on a live plan.</p>
+  {% endif %}
+{% endblock %}

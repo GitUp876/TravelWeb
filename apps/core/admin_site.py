@@ -7,6 +7,7 @@ one's index.
 """
 
 from django.conf import settings
+from django.urls import path
 from django_otp.admin import OTPAdminSite
 
 
@@ -21,3 +22,22 @@ class StaffAdminSite(OTPAdminSite):
     @property
     def index_title(self) -> str:
         return "Day-to-day trip management"
+
+    def get_urls(self):
+        """Adds the staff reports, wrapped in the admin's own access check.
+
+        ``admin_view`` is what applies this site's rules to a plain view, which
+        here means the verified TOTP device every admin page demands. The view
+        imports late because this module is loaded while the app registry is
+        still starting.
+        """
+        from apps.bookings import admin_views
+
+        reports = [
+            path(
+                "reports/payments-due/",
+                self.admin_view(admin_views.payments_due),
+                name="payments-due",
+            ),
+        ]
+        return reports + super().get_urls()
