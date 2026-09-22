@@ -55,9 +55,15 @@ Built in phase 3 so far:
   took it, and confirms it. There is deliberately no field for a card number: a
   guest paying by card pays on Stripe's own page.
 
-Not built yet, by design:
+- Trip manifests. The passenger list for a departure, reached from the
+  "Passenger list" link on the departures list. It groups travellers the way a
+  coach loads — by boarding point, in boarding order, with anyone who has no
+  pickup at the end — and prints cleanly. Dietary and mobility notes appear on
+  this page and nowhere else: the CSV download deliberately leaves them out,
+  because that file gets emailed on, and every download is written to the audit
+  trail.
 
-- Trip manifests are the remaining phase 3 work.
+That completes the phase 3 scope.
 
 ## How paying works
 

@@ -44,5 +44,15 @@ class StaffAdminSite(OTPAdminSite):
                 self.admin_view(admin_views.phone_booking),
                 name="phone-booking",
             ),
+            path(
+                "departures/<int:departure_id>/manifest/",
+                self.admin_view(admin_views.manifest),
+                name="departure-manifest",
+            ),
+            path(
+                "departures/<int:departure_id>/manifest.csv",
+                self.admin_view(admin_views.manifest_csv),
+                name="departure-manifest-csv",
+            ),
         ]
         return staff_pages + super().get_urls()
