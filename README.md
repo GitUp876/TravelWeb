@@ -46,10 +46,18 @@ Built in phase 3 so far:
   read-only and needs the `bookings.view_scheduledpayment` permission on top of
   the admin's usual MFA.
 
+- Phone bookings and offline payments. Staff can take a booking on a guest's
+  behalf from "Phone booking" in the admin header. A staff booking reaches the
+  seats held back from the website and dates the website has closed, which is
+  what holding seats back is for, and it holds them for `STAFF_HOLD_DAYS` (7 by
+  default) rather than the twenty minutes a web checkout gets. Money taken by
+  hand — cash, cheque, bank transfer — is recorded against the booking with who
+  took it, and confirms it. There is deliberately no field for a card number: a
+  guest paying by card pays on Stripe's own page.
+
 Not built yet, by design:
 
-- Trip manifests, phone bookings and offline payments are the remaining phase 3
-  work.
+- Trip manifests are the remaining phase 3 work.
 
 ## How paying works
 

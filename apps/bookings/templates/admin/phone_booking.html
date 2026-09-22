@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h1>Take a phone booking</h1>
+
+  <form method="get">
+    {{ picker.as_p }}
+    <button type="submit">Continue</button>
+  </form>
+
+  {% if chosen %}
+    <h2>{{ departure.trip.title }} — {{ departure.start_date|date:'l j F Y' }}</h2>
+    <p class="help">
+      {{ seats_left }} seat{{ seats_left|pluralize }} left on the coach{% if held_back %},
+      including the {{ held_back }} held back from the website{% endif %}.
+      Prices come from this date's own price options.
+    </p>
+
+    <form method="post" action="?departure={{ departure.pk }}&amp;party={{ party }}">
+      {% csrf_token %}
+
+      <fieldset>
+        <legend>Who the booking is for</legend>
+        {{ guest_form.as_p }}
+      </fieldset>
+
+      {% for form in traveller_forms %}
+        <fieldset>
+          <legend>Traveller {{ forloop.counter }}</legend>
+          {{ form.as_p }}
+        </fieldset>
+      {% endfor %}
+
+      <fieldset>
+        <legend>Payment taken now</legend>
+        {{ payment_form.as_p }}
+        <p class="help">
+          Cash, cheque or bank transfer only. Never type a card number here — a guest
+          paying by card pays on Stripe's own page, which is what keeps this site out
+          of scope for card data. Recording a payment confirms the booking.
+        </p>
+      </fieldset>
+
+      <button type="submit" class="default">Create booking</button>
+    </form>
+  {% endif %}
+{% endblock %}

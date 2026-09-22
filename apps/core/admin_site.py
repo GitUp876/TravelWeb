@@ -33,11 +33,16 @@ class StaffAdminSite(OTPAdminSite):
         """
         from apps.bookings import admin_views
 
-        reports = [
+        staff_pages = [
             path(
                 "reports/payments-due/",
                 self.admin_view(admin_views.payments_due),
                 name="payments-due",
             ),
+            path(
+                "bookings/phone/",
+                self.admin_view(admin_views.phone_booking),
+                name="phone-booking",
+            ),
         ]
-        return reports + super().get_urls()
+        return staff_pages + super().get_urls()

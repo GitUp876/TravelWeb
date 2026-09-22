@@ -172,6 +172,11 @@ ADMIN_URL = env("DJANGO_ADMIN_URL", "staff/")
 # How long a booking may hold seats before they are released back to the pool.
 SEAT_HOLD_MINUTES = int(env("SEAT_HOLD_MINUTES", "20"))
 
+# A phone booking is not someone sitting at a checkout page: staff need days to
+# collect a cheque, not minutes. An unpaid one still releases its seats in the
+# end, so a forgotten booking cannot hold a seat for ever.
+STAFF_HOLD_DAYS = int(env("STAFF_HOLD_DAYS", "7"))
+
 # --- Payments (Stripe) -----------------------------------------------------
 # Card details never reach this application: the guest types them into Stripe's
 # own hosted checkout page. We hold identifiers only.
