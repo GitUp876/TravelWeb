@@ -242,7 +242,9 @@ class PaymentPlan(TimeStampedModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     instalment_count = models.PositiveSmallIntegerField()
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    stripe_schedule_id = models.CharField(max_length=64, blank=True, db_index=True)
+    # The card the guest saved at the deposit checkout, charged off-session for
+    # each instalment. An identifier only; no card detail is stored here.
+    stripe_payment_method_id = models.CharField(max_length=64, blank=True, db_index=True)
 
     def __str__(self) -> str:
         return f"Plan for {self.booking.reference}"
@@ -264,7 +266,7 @@ class ScheduledPayment(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
     attempt_count = models.PositiveSmallIntegerField(default=0)
     last_attempt_at = models.DateTimeField(null=True, blank=True)
-    stripe_invoice_id = models.CharField(max_length=64, blank=True, db_index=True)
+    stripe_payment_intent_id = models.CharField(max_length=64, blank=True, db_index=True)
 
     class Meta:
         ordering = ["due_date"]

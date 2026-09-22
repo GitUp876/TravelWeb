@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -11,11 +10,9 @@ from django.conf import settings
 from apps.bookings.models import Booking
 
 from . import gateway
+from .money import to_minor_units
 
-
-def to_minor_units(amount: Decimal) -> int:
-    """Dollars to cents, rounded the way money is."""
-    return int((amount * 100).to_integral_value())
+__all__ = ["build_line_items", "start_checkout", "start_plan_checkout", "to_minor_units"]
 
 
 def build_line_items(booking: Booking) -> list[dict[str, Any]]:
@@ -48,16 +45,42 @@ def build_line_items(booking: Booking) -> list[dict[str, Any]]:
 
 
 def start_checkout(booking: Booking, *, success_url: str, cancel_url: str) -> str:
-    """Creates the checkout session and returns the URL to send the guest to."""
+    """Creates a pay-in-full checkout session and returns the URL for the guest."""
     session = gateway.create_checkout_session(
         line_items=build_line_items(booking),
         customer_email=booking.guest.email,
         client_reference_id=booking.reference,
-        metadata={"booking_reference": booking.reference},
+        metadata={"booking_reference": booking.reference, "kind": "full"},
         success_url=success_url,
         cancel_url=cancel_url,
         # The booking reference makes a double-submit return the same session
         # instead of opening a second one.
         idempotency_key=f"checkout-{booking.reference}",
+    )
+    return str(session.url)
+
+
+def start_plan_checkout(booking: Booking, *, success_url: str, cancel_url: str) -> str:
+    """Creates a deposit checkout that also saves the card for the instalments.
+
+    Only the deposit is charged now. The rest of the balance is taken later, on
+    the schedule already written against the booking's plan.
+    """
+    plan = booking.payment_plan
+    session = gateway.create_deposit_checkout_session(
+        amount_minor=to_minor_units(plan.deposit_amount),
+        currency=settings.STRIPE_CURRENCY,
+        product_name=f"{booking.departure.trip.title} — deposit",
+        product_description=(
+            f"Deposit today; the balance follows in {plan.instalment_count} "
+            "scheduled instalment(s)."
+        ),
+        client_reference_id=booking.reference,
+        metadata={"booking_reference": booking.reference, "kind": "plan_deposit"},
+        success_url=success_url,
+        cancel_url=cancel_url,
+        idempotency_key=f"deposit-{booking.reference}",
+        customer_email="" if booking.guest.stripe_customer_id else booking.guest.email,
+        customer_id=booking.guest.stripe_customer_id,
     )
     return str(session.url)

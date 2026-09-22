@@ -20,8 +20,10 @@ from .models import StripeEvent
 logger = logging.getLogger(__name__)
 
 HANDLERS = {
-    "checkout.session.completed": services.confirm_paid_booking,
+    "checkout.session.completed": services.handle_checkout_completed,
     "checkout.session.expired": services.release_expired_checkout,
+    "payment_intent.succeeded": services.record_instalment_payment,
+    "payment_intent.payment_failed": services.fail_instalment_payment,
 }
 
 

@@ -73,7 +73,7 @@ class BookingAdmin(AuditedAdmin):
 class ScheduledPaymentInline(admin.TabularInline):
     model = ScheduledPayment
     extra = 0
-    readonly_fields = ("stripe_invoice_id", "attempt_count", "last_attempt_at")
+    readonly_fields = ("stripe_payment_intent_id", "attempt_count", "last_attempt_at")
 
 
 @admin.register(PaymentPlan)
@@ -81,7 +81,7 @@ class PaymentPlanAdmin(AuditedAdmin):
     list_display = ("booking", "status", "instalment_count", "deposit_amount")
     list_filter = ("status",)
     search_fields = ("booking__reference",)
-    readonly_fields = ("stripe_schedule_id",)
+    readonly_fields = ("stripe_payment_method_id",)
     inlines = [ScheduledPaymentInline]
 
 
