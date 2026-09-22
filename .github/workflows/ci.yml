@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Lets a maintainer start a run from the Actions tab without pushing a
+  # commit. Available once this file is on the default branch.
+  workflow_dispatch:
 
 permissions:
   contents: read
