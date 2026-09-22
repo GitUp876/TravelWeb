@@ -92,6 +92,36 @@ class TravellerForm(forms.ModelForm):
         self.fields["emergency_contact_phone"].required = True
 
 
+class PaymentOptionForm(forms.Form):
+    """How the guest wants to pay: in full, or a deposit then instalments.
+
+    The instalment option is only ever offered when the departure allows it;
+    the choice is re-checked server-side before a plan is set up, so posting the
+    plan value for a date that does not offer one changes nothing.
+    """
+
+    FULL = "full"
+    PLAN = "plan"
+
+    # Optional: an absent or empty value means pay in full, so the plain
+    # pay-in-full flow needs no extra field in its post.
+    payment_option = forms.ChoiceField(
+        label="Payment",
+        widget=forms.RadioSelect,
+        initial=FULL,
+        required=False,
+        choices=[(FULL, "Pay in full now")],
+    )
+
+    def __init__(self, *args, plan_available: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if plan_available:
+            self.fields["payment_option"].choices = [
+                (self.FULL, "Pay in full now"),
+                (self.PLAN, "Pay a deposit now, the balance in scheduled instalments"),
+            ]
+
+
 class BookingLookupForm(forms.Form):
     """Asks for the email on a booking and emails the link back.
 

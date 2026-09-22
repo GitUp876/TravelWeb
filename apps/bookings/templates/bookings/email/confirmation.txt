@@ -10,8 +10,12 @@ Travelling:
 {% for traveller in travellers %}- {{ traveller.full_name }} ({{ traveller.price_option.label }}){% if traveller.pickup %}, boarding at {{ traveller.pickup.pickup_point.name }} at {{ traveller.pickup.boarding_time|time:"g:i a" }}{% endif %}
 {% endfor %}
 Total: ${{ booking.total_amount|floatformat:2 }}
-Paid: ${{ booking.amount_paid|floatformat:2 }}
-
+Paid so far: ${{ booking.amount_paid|floatformat:2 }}
+{% if booking.payment_plan %}
+You chose a payment plan. Your ${{ booking.payment_plan.deposit_amount|floatformat:2 }} deposit is paid; the balance is charged automatically to the same card on these dates:
+{% for instalment in booking.payment_plan.instalments.all %}- {{ instalment.due_date|date:"j F Y" }}: ${{ instalment.amount|floatformat:2 }}
+{% endfor %}We will email you if any instalment does not go through.
+{% endif %}
 View or check your booking at any time:
 {{ manage_url }}
 

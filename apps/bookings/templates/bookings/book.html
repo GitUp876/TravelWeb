@@ -35,6 +35,19 @@
       </fieldset>
     {% endfor %}
 
+    {% if plan_available %}
+      <fieldset>
+        <legend>How would you like to pay?</legend>
+        {{ payment_form.payment_option }}
+        <p class="note">
+          On a payment plan we take a ${{ deposit_amount|floatformat:2 }} deposit today and
+          charge the balance in scheduled instalments, the last on
+          {{ final_payment_due_date|date:'j F Y' }}. Your card is saved securely by
+          Stripe for those instalments.
+        </p>
+      </fieldset>
+    {% endif %}
+
     <p class="note">
       The next page is Stripe's secure checkout. Your card details go straight to
       Stripe and are never seen by this website.

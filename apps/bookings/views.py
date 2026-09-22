@@ -20,10 +20,16 @@ from django.views.decorators.http import require_http_methods
 
 from apps.catalog.models import Departure
 from apps.core.audit import client_ip
-from apps.payments import checkout, gateway
+from apps.payments import checkout, gateway, plans
 
 from .emails import send_booking_link
-from .forms import MAX_PARTY_SIZE, BookingLookupForm, LeadGuestForm, TravellerForm
+from .forms import (
+    MAX_PARTY_SIZE,
+    BookingLookupForm,
+    LeadGuestForm,
+    PaymentOptionForm,
+    TravellerForm,
+)
 from .models import Booking
 from .services import DepartureNotBookable, SeatsUnavailable, create_pending_booking
 from .tokens import read_token
@@ -67,6 +73,7 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             status=409,
         )
 
+    plan_available = departure.payment_plan_available
     prefix_range = range(party)
     if request.method == "POST":
         guest_form = LeadGuestForm(request.POST)
@@ -74,7 +81,13 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             TravellerForm(request.POST, departure=departure, prefix=f"t{index}")
             for index in prefix_range
         ]
+        payment_form = PaymentOptionForm(request.POST, plan_available=plan_available)
         if guest_form.is_valid() and all(form.is_valid() for form in traveller_forms):
+            # Read the choice directly: an unknown value (a stale form for a date
+            # that no longer offers a plan) simply means pay in full.
+            wants_plan = (
+                plan_available and request.POST.get("payment_option") == PaymentOptionForm.PLAN
+            )
             try:
                 booking = create_pending_booking(
                     departure=departure,
@@ -93,12 +106,25 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             except DepartureNotBookable:
                 messages.error(request, "This date has just closed for booking.")
             else:
-                return _redirect_to_payment(request, booking)
+                if wants_plan:
+                    try:
+                        plans.create_plan_for_booking(booking)
+                    except plans.PlanNotAvailable:
+                        # The eligibility window closed between loading the page
+                        # and submitting; fall back to paying in full.
+                        wants_plan = False
+                        messages.info(
+                            request,
+                            "This date is no longer eligible for a payment plan, "
+                            "so we have set it up to pay in full.",
+                        )
+                return _redirect_to_payment(request, booking, use_plan=wants_plan)
     else:
         guest_form = LeadGuestForm()
         traveller_forms = [
             TravellerForm(departure=departure, prefix=f"t{index}") for index in prefix_range
         ]
+        payment_form = PaymentOptionForm(plan_available=plan_available)
 
     return render(
         request,
@@ -110,11 +136,17 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             "party_choices": range(1, min(MAX_PARTY_SIZE, max(departure.seats_available, 1)) + 1),
             "guest_form": guest_form,
             "traveller_forms": traveller_forms,
+            "payment_form": payment_form,
+            "plan_available": plan_available,
+            "deposit_amount": departure.deposit_amount,
+            "final_payment_due_date": departure.final_payment_due_date,
         },
     )
 
 
-def _redirect_to_payment(request: HttpRequest, booking: Booking) -> HttpResponse:
+def _redirect_to_payment(
+    request: HttpRequest, booking: Booking, *, use_plan: bool = False
+) -> HttpResponse:
     from .tokens import make_token
 
     success_url = settings.SITE_BASE_URL + reverse(
@@ -124,9 +156,14 @@ def _redirect_to_payment(request: HttpRequest, booking: Booking) -> HttpResponse
         "catalog:departure-detail", kwargs={"pk": booking.departure_id}
     )
     try:
-        payment_url = checkout.start_checkout(
-            booking, success_url=success_url, cancel_url=f"{cancel_url}?cancelled=1"
-        )
+        if use_plan:
+            payment_url = checkout.start_plan_checkout(
+                booking, success_url=success_url, cancel_url=f"{cancel_url}?cancelled=1"
+            )
+        else:
+            payment_url = checkout.start_checkout(
+                booking, success_url=success_url, cancel_url=f"{cancel_url}?cancelled=1"
+            )
     except gateway.PaymentConfigurationError:
         logger.error("Checkout attempted while Stripe is unconfigured")
         _abandon(booking)
@@ -141,11 +178,12 @@ def _redirect_to_payment(request: HttpRequest, booking: Booking) -> HttpResponse
 
 
 def _abandon(booking: Booking) -> None:
-    """Releases the hold when we never got the guest as far as paying."""
+    """Releases the hold, and stops any plan, when the guest never paid."""
     with transaction.atomic():
         booking.status = Booking.Status.EXPIRED
         booking.hold_expires_at = None
         booking.save(update_fields=["status", "hold_expires_at"])
+    plans.cancel_plan(booking)
 
 
 def booking_detail(request: HttpRequest, token: str) -> HttpResponse:
@@ -157,8 +195,11 @@ def booking_detail(request: HttpRequest, token: str) -> HttpResponse:
     if reference is None:
         raise Http404("This link is not valid")
     booking = get_object_or_404(
-        Booking.objects.select_related("departure__trip", "guest").prefetch_related(
-            "travellers__price_option", "travellers__pickup__pickup_point", "payments"
+        Booking.objects.select_related("departure__trip", "guest", "payment_plan").prefetch_related(
+            "travellers__price_option",
+            "travellers__pickup__pickup_point",
+            "payments",
+            "payment_plan__instalments",
         ),
         reference=reference,
     )

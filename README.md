@@ -31,11 +31,18 @@ Built in phase 2:
 - A confirmation email, and a `release_expired_holds` command that frees seats
   when a guest never finishes paying.
 
+Built in phase 3 so far:
+
+- Payment plans. A guest can pay a deposit now and let the balance follow in
+  equal monthly instalments, the last landing on the departure's final-payment
+  date. The deposit is taken through Stripe's hosted checkout, which also saves
+  the card; instalments are then charged off-session on their due dates. No card
+  detail reaches this application at any point.
+
 Not built yet, by design:
 
-- Payment plans are modelled but not charged. Instalment scheduling is
-  phase 3, together with manifests, the payments-due report, phone bookings
-  and offline payments.
+- Trip manifests, the payments-due report, phone bookings and offline payments
+  are the remaining phase 3 work.
 
 ## How paying works
 
@@ -64,13 +71,22 @@ stripe listen --forward-to localhost:8000/stripe/webhook/   # prints whsec_...
 
 Put that signing secret in `STRIPE_WEBHOOK_SECRET`. In production, add an
 endpoint in the Stripe dashboard for `https://<host>/stripe/webhook/`
-subscribed to `checkout.session.completed` and `checkout.session.expired`.
+subscribed to `checkout.session.completed`, `checkout.session.expired`,
+`payment_intent.succeeded` and `payment_intent.payment_failed`. The last two
+confirm and reconcile the off-session instalment charges.
 
 ### Scheduled jobs
 
 ```bash
 python manage.py release_expired_holds    # every few minutes
+python manage.py charge_due_instalments    # once or twice a day
 ```
+
+`charge_due_instalments` charges any payment-plan instalment that has come due,
+off-session, against the card the guest saved at their deposit checkout. It is
+idempotent per instalment, so running it twice never takes a payment twice; a
+declined instalment marks itself and its plan as needing attention rather than
+retrying blindly. `--dry-run` lists what is due without charging.
 
 ## Running it locally
 
@@ -133,6 +149,13 @@ apps/payments/       the Stripe gateway, checkout, webhook and event log
   hosted checkout; the only card fields here are brand and last four digits,
   for staff recognition. Adding a card number field would move the site out of
   PCI SAQ A.
+- **Instalments charge a saved card, never a stored one.** The card for a
+  payment plan is saved by Stripe at the deposit checkout
+  (`setup_future_usage='off_session'`); we keep only the Stripe customer and
+  payment-method identifiers and charge against them. The charger refuses to run
+  unless the deposit confirmed the booking and those identifiers are present, so
+  a plan can never charge a card the guest did not present, and its idempotency
+  key is stable per instalment so a repeated run cannot take a payment twice.
 - **Guests have no passwords and should not get any.** Access to a booking is
   an expiring signed link to the address on the booking.
 - **Totals are recalculated server-side** from each traveller's price option.

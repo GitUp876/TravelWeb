@@ -44,5 +44,32 @@
     </tbody>
   </table>
 
+  {% if booking.payment_plan %}
+    <h2>Payment plan</h2>
+    <p class="meta">
+      A ${{ booking.payment_plan.deposit_amount|floatformat:2 }} deposit plus
+      {{ booking.payment_plan.instalment_count }}
+      instalment{{ booking.payment_plan.instalment_count|pluralize }}.
+    </p>
+    <table class="instalments">
+      <thead>
+        <tr><th scope="col">Due</th><th scope="col">Amount</th><th scope="col">Status</th></tr>
+      </thead>
+      <tbody>
+        {% for instalment in booking.payment_plan.instalments.all %}
+          <tr>
+            <td>{{ instalment.due_date|date:'j F Y' }}</td>
+            <td>${{ instalment.amount|floatformat:2 }}</td>
+            <td>{{ instalment.get_status_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="note">
+      Each instalment is charged automatically to the card you paid your deposit with.
+      We email you if a charge does not go through.
+    </p>
+  {% endif %}
+
   <p class="note">Keep this page's link to yourself — anyone who has it can see this booking.</p>
 {% endblock %}
