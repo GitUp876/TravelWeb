@@ -1,69 +1,132 @@
 {% extends "base.html" %}
+{% load humanize ui %}
 
-{% block title %}{{ departure.trip.title }}, {{ departure.start_date|date:'j M Y' }} — {{ site_name }}{% endblock %}
+{% block title %}{{ departure.trip.title }}, {{ departure.start_date|date:'j M Y' }} · {{ site_name }}{% endblock %}
+{% block description %}{{ departure.trip.summary }}{% endblock %}
 
 {% block content %}
+  {% with trip=departure.trip %}
+  {% trip_photo trip "full" as hero %}
   <article>
-    <p class="breadcrumb"><a href="{{ departure.trip.get_absolute_url }}">{{ departure.trip.title }}</a></p>
-    <h1>{{ departure.start_date|date:'j F Y' }}{% if departure.duration_days > 1 %} – {{ departure.end_date|date:'j F Y' }}{% endif %}</h1>
-    <p class="lede">{{ departure.trip.summary }}</p>
+    <section class="page-banner">
+      <img src="{{ hero.url }}" alt="{{ hero.alt }}" width="2000" height="1125">
+      <div class="wrap page-banner-content">
+        <ol class="breadcrumb">
+          <li><a href="{% url 'catalog:home' %}">Home</a></li>
+          <li><a href="{% url 'catalog:category' trip.category %}">{{ trip.get_category_display }}</a></li>
+          <li><a href="{{ trip.get_absolute_url }}">{{ trip.title }}</a></li>
+        </ol>
+        <h1>{{ trip.title }}</h1>
+        <p class="lede">
+          <time datetime="{{ departure.start_date|date:'Y-m-d' }}">{{ departure.start_date|date:'l j F Y' }}</time>{% if departure.duration_days > 1 %}
+            to <time datetime="{{ departure.end_date|date:'Y-m-d' }}">{{ departure.end_date|date:'l j F Y' }}</time>{% endif %}
+        </p>
+        <p class="pill-row">
+          <span class="tag tag-neutral">{% icon "clock" %} {% if departure.duration_days > 1 %}{{ departure.duration_days }} days{% else %}Day trip{% endif %}</span>
+          {% if trip.meals_included %}<span class="tag tag-neutral">{% icon "utensils" %} {{ trip.meals_included }} meal{{ trip.meals_included|pluralize }}</span>{% endif %}
+        </p>
+      </div>
+    </section>
 
-    <h2>Prices per person</h2>
-    <table class="prices">
-      <thead><tr><th scope="col">Option</th><th scope="col">Price</th></tr></thead>
-      <tbody>
-        {% for option in departure.price_options.all %}
-          {% if option.is_available %}
-            <tr>
-              <th scope="row">{{ option.label }}{% if option.description %} <span class="meta">{{ option.description }}</span>{% endif %}</th>
-              <td>${{ option.amount|floatformat:2 }}</td>
-            </tr>
+    <div class="wrap layout">
+      <div class="layout-main">
+        <section aria-labelledby="prices-title">
+          <h2 id="prices-title">Prices per person</h2>
+          <table class="price-table prices">
+            <thead><tr><th scope="col">Option</th><th scope="col">Price</th></tr></thead>
+            <tbody>
+              {% for option in departure.price_options.all %}
+                {% if option.is_available %}
+                  <tr>
+                    <th scope="row">{{ option.label }}{% if option.description %} <span class="meta">{{ option.description }}</span>{% endif %}</th>
+                    <td>${{ option.amount|floatformat:2|intcomma }}<small>per person</small></td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+
+        <section aria-labelledby="pickups-title">
+          <h2 id="pickups-title">Where to board</h2>
+          {% if departure.pickups.all %}
+            <ul class="pickups">
+              {% for pickup in departure.pickups.all %}
+                <li>
+                  <span class="pin">{% icon "map-pin" %}</span>
+                  <div>
+                    <strong>{{ pickup.pickup_point.name }}</strong>
+                    <span>{{ pickup.pickup_point.address }}, {{ pickup.pickup_point.city }}{% if pickup.pickup_point.region %}, {{ pickup.pickup_point.region }}{% endif %}</span>
+                  </div>
+                  <p class="board-time"><small>Boards</small>{{ pickup.boarding_time|time:'g:i a' }}</p>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="card"><p class="empty">Pickup points for this date are still being confirmed.</p></div>
           {% endif %}
-        {% endfor %}
-      </tbody>
-    </table>
+        </section>
 
-    <h2>Pickup points</h2>
-    {% if departure.pickups.all %}
-      <ul class="pickups">
-        {% for pickup in departure.pickups.all %}
-          <li>
-            <strong>{{ pickup.pickup_point.name }}</strong>, {{ pickup.pickup_point.city }}
-            — boards {{ pickup.boarding_time|time:'g:i a' }}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="empty">Pickup points for this date are still being confirmed.</p>
-    {% endif %}
+        {% if departure.cancellation_policy %}
+          <section aria-labelledby="policy-title">
+            <h2 id="policy-title">Cancellation policy</h2>
+            <div class="card prose">{{ departure.cancellation_policy|linebreaks }}</div>
+          </section>
+        {% endif %}
 
-    <h2>Booking</h2>
-    <p class="availability">
-      {% if departure.is_sold_out %}
-        <span class="tag tag-full">Sold out</span>
-      {% else %}
-        <span class="tag tag-open">{{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} available</span>
-      {% endif %}
-    </p>
-    {% if departure.payment_plan_available %}
-      <p>A payment plan is available on this date: ${{ departure.deposit_amount|floatformat:2 }}
-        today, then equal instalments finishing {{ departure.final_payment_due_date|date:'j F Y' }}.</p>
-    {% endif %}
-    {% if request.GET.cancelled %}
-      <p class="note">Your payment was not completed, so nothing was charged and the
-        seats were released. You can start again below.</p>
-    {% endif %}
-    {% if departure.is_bookable and payments_enabled %}
-      <p><a class="button primary" href="{% url 'bookings:book' departure.pk %}">Book this departure</a></p>
-    {% elif departure.is_bookable %}
-      <p class="note">Online payment isn't switched on yet. Please call us to reserve a seat.</p>
-    {% else %}
-      <p class="note">This date is closed for online booking. Please call us.</p>
-    {% endif %}
+        <p><a class="link-arrow" href="{{ trip.get_absolute_url }}">{% icon "arrow-left" %} Itinerary, photos and other dates</a></p>
+      </div>
 
-    {% if departure.cancellation_policy %}
-      <h2>Cancellation policy</h2>
-      <div class="prose">{{ departure.cancellation_policy|linebreaks }}</div>
-    {% endif %}
+      <aside class="aside-sticky" aria-label="Booking">
+        <div class="book-panel">
+          <h2>Book this date</h2>
+          {% if departure.lead_price %}
+            <p class="price-from"><small>From</small><strong>${{ departure.lead_price|floatformat:2|intcomma }}</strong> <span>per person</span></p>
+          {% endif %}
+          <dl>
+            <div><dt>{% icon "calendar" %} Departs</dt><dd>{{ departure.start_date|date:'j M Y' }}</dd></div>
+            {% if departure.duration_days > 1 %}<div><dt>{% icon "calendar" %} Returns</dt><dd>{{ departure.end_date|date:'j M Y' }}</dd></div>{% endif %}
+            <div><dt>{% icon "users" %} Seats</dt><dd class="availability">
+              {% if departure.is_sold_out %}
+                <span class="tag tag-full">Sold out</span>
+              {% elif departure.seats_available <= 5 %}
+                <span class="tag tag-low">{{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} available</span>
+              {% else %}
+                <span class="tag tag-open">{{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} available</span>
+              {% endif %}
+            </dd></div>
+          </dl>
+
+          {% if request.GET.cancelled %}
+            <p class="message message-warning">Your payment was not completed, so nothing was charged and the
+              seats were released. You can start again below.</p>
+          {% endif %}
+
+          {% if departure.is_bookable and payments_enabled %}
+            <a class="btn btn-primary btn-lg btn-block" href="{% url 'bookings:book' departure.pk %}">Book this departure {% icon "arrow-right" %}</a>
+          {% elif departure.is_bookable %}
+            <p class="note">Online payment isn't switched on yet. Please call us to reserve a seat.</p>
+          {% else %}
+            <p class="note">This date is closed for online booking. Please call us.</p>
+          {% endif %}
+
+          {% if departure.payment_plan_available %}
+            <div class="secure-note no-print">
+              {% icon "wallet" %}
+              <span>A payment plan is available on this date: ${{ departure.deposit_amount|floatformat:2|intcomma }}
+                today, then equal instalments finishing {{ departure.final_payment_due_date|date:'j F Y' }}.</span>
+            </div>
+          {% endif %}
+          <p class="note">{% icon "lock" %} You pay on Stripe's secure page. We never see your card.</p>
+        </div>
+        {% if site_phone %}
+          <div class="help-card">
+            <strong>{% icon "phone" %} Booking for a group?</strong>
+            <p>Call <a href="tel:{{ site_phone_href }}">{{ site_phone }}</a> and we'll sort it out with you.</p>
+          </div>
+        {% endif %}
+      </aside>
+    </div>
   </article>
+  {% endwith %}
 {% endblock %}

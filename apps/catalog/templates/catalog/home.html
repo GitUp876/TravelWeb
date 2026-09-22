@@ -1,33 +1,150 @@
 {% extends "base.html" %}
+{% load humanize ui %}
 
 {% block content %}
-  <section class="hero">
-    <h1>{{ site_name }}</h1>
-    <p class="lede">{{ site_tagline }}</p>
+  {% with hero=site_photos.home_hero %}
+    <section class="hero" aria-labelledby="hero-title">
+      <img class="hero-media" src="{{ hero.url }}" alt="{{ hero.alt }}" width="1920" height="1080" fetchpriority="high">
+      <div class="wrap">
+        <div class="hero-content">
+          <p class="eyebrow">Escorted group travel</p>
+          <h1 id="hero-title">Leave the driving to us. <em>Enjoy the journey.</em></h1>
+          <p class="hero-lede">{{ site_tagline }}. Board close to home, travel with good company, and let a friendly tour director take care of the rest.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="#departures">See upcoming trips {% icon "arrow-right" %}</a>
+            <a class="btn btn-ghost-light btn-lg" href="#types">Browse by type</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  {% endwith %}
+
+  <div class="wrap">
+    <nav class="type-picker" aria-labelledby="picker-title">
+      <h2 id="picker-title">What kind of trip are you after?</h2>
+      <ul>
+        {% for category in categories %}
+          <li>
+            <a href="{% url 'catalog:category' category.value %}">
+              <span class="type-icon">{% icon category.icon "icon-lg" %}</span>
+              <span>{{ category.label }}<small>{{ category.trip_count }} trip{{ category.trip_count|pluralize }}</small></span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </div>
+
+  <section class="section-tight" aria-label="Why travel with us">
+    <div class="wrap">
+      <ul class="trust">
+        <li><span class="trust-icon">{% icon "users" "icon-lg" %}</span><div><strong>Travel together</strong><span>Relaxed group trips with good company.</span></div></li>
+        <li><span class="trust-icon">{% icon "map-pin" "icon-lg" %}</span><div><strong>Pickups near you</strong><span>Choose the boarding point that suits you.</span></div></li>
+        <li><span class="trust-icon">{% icon "wallet" "icon-lg" %}</span><div><strong>Pay over time</strong><span>Spread the cost on longer tours, interest-free.</span></div></li>
+        <li><span class="trust-icon">{% icon "shield" "icon-lg" %}</span><div><strong>Secure booking</strong><span>Pay on Stripe's protected checkout.</span></div></li>
+      </ul>
+    </div>
   </section>
 
-  <section>
-    <h2>Next departures</h2>
-    {% if featured %}
-      <div class="grid">
-        {% for departure in featured %}
-          {% include "catalog/_departure_card.html" %}
+  <section class="section" id="departures" aria-labelledby="departures-title">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Coming up</p>
+          <h2 id="departures-title">Next departures</h2>
+          <p>Seats are selling now. Pick a date to see prices, pickup times and what's included.</p>
+        </div>
+      </div>
+      {% if featured %}
+        <div class="grid">
+          {% for departure in featured %}
+            {% include "catalog/_departure_card.html" %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="card"><p class="empty">No dates are open for booking just yet. Please check back soon.</p></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section section-alt" id="types" aria-labelledby="types-title">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Find your kind of trip</p>
+          <h2 id="types-title">Browse by type</h2>
+          <p>From an afternoon show to a week away, there's a trip for every pace.</p>
+        </div>
+      </div>
+      <div class="tiles">
+        {% for category in categories %}
+          <a class="tile" href="{% url 'catalog:category' category.value %}">
+            <div class="tile-media">
+              <img src="{{ category.photo.card_url }}" alt="" loading="lazy" width="800" height="533">
+              <h3><span class="tile-icon">{% icon category.icon %}</span> {{ category.label }}</h3>
+            </div>
+            <div class="tile-body">
+              <p>{{ category.blurb }}</p>
+              <span class="tile-count">{{ category.trip_count }} trip{{ category.trip_count|pluralize }} on sale {% icon "arrow-right" %}</span>
+            </div>
+          </a>
         {% endfor %}
       </div>
-    {% else %}
-      <p class="empty">No dates are open for booking just yet. Please check back soon.</p>
-    {% endif %}
+    </div>
   </section>
 
-  <section>
-    <h2>Browse by type</h2>
-    <ul class="category-list">
-      {% for category in categories %}
-        <li>
-          <a href="{% url 'catalog:category' category.value %}">{{ category.label }}</a>
-          <span class="count">{{ category.trip_count }} trip{{ category.trip_count|pluralize }}</span>
-        </li>
-      {% endfor %}
-    </ul>
+  <section class="section" aria-labelledby="plan-title">
+    <div class="wrap feature">
+      <div class="feature-media">
+        <img src="{{ site_photos.overnight.card_url }}" alt="" loading="lazy" width="800" height="533">
+        <div class="feature-card" aria-hidden="true">
+          <strong>Deposit today, the rest in easy steps</strong>
+          <span class="small muted">Automatic instalments, finished before you travel</span>
+          <div class="plan-bar"><span class="deposit"></span><span class="paid"></span><span class="paid"></span><span></span><span></span></div>
+        </div>
+      </div>
+      <div>
+        <p class="eyebrow">Payment plans</p>
+        <h2 id="plan-title">Book now, pay over time</h2>
+        <p class="lede">Secure your seats on a longer tour with a small deposit, then spread the balance in equal monthly instalments.</p>
+        <ul class="ticklist">
+          <li>{% icon "check-circle" %} <span>No interest and no fees for paying in instalments.</span></li>
+          <li>{% icon "check-circle" %} <span>Instalments are taken automatically on the dates shown on your booking page.</span></li>
+          <li>{% icon "check-circle" %} <span>Pay off the balance early whenever you like from your booking page.</span></li>
+        </ul>
+        <a class="link-arrow" href="#departures">Look for the payment plan badge {% icon "arrow-right" %}</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Simple from start to finish</p>
+          <h2 id="how-title">How booking works</h2>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><h3>Choose your date</h3><p>See every departure with its prices, pickup points and what's included.</p></li>
+        <li><h3>Tell us who's travelling</h3><p>Pick each traveller's boarding point and let us know about any dietary or mobility needs.</p></li>
+        <li><h3>Pay securely</h3><p>Pay in full or with a deposit on Stripe's secure checkout. Your confirmation arrives by email.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="cta-band">
+        <div>
+          <h2>Already booked with us?</h2>
+          <p>Look up your booking to check your pickup time, see your payments or pay off your balance.</p>
+        </div>
+        <div class="cta-actions">
+          <a class="btn btn-light btn-lg" href="{% url 'bookings:find' %}">{% icon "ticket" %} Find my booking</a>
+          {% if site_phone %}<a class="btn btn-ghost-light btn-lg" href="tel:{{ site_phone_href }}">{% icon "phone" %} {{ site_phone }}</a>{% endif %}
+        </div>
+      </div>
+    </div>
   </section>
 {% endblock %}

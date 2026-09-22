@@ -1,27 +1,40 @@
-<article class="card">
-  <h3><a href="{{ departure.get_absolute_url }}">{{ departure.trip.title }}</a></h3>
-  <p class="meta">
-    <time datetime="{{ departure.start_date|date:'Y-m-d' }}">{{ departure.start_date|date:'j M Y' }}</time>
-    {% if departure.duration_days > 1 %}
-      – <time datetime="{{ departure.end_date|date:'Y-m-d' }}">{{ departure.end_date|date:'j M Y' }}</time>
-      · {{ departure.duration_days }} days
-    {% endif %}
-    {% if departure.trip.meals_included %} · {{ departure.trip.meals_included }} meals{% endif %}
-  </p>
-  <p>{{ departure.trip.summary }}</p>
-  <p class="price">
-    {% if departure.lead_price %}From ${{ departure.lead_price|floatformat:2 }} per person{% endif %}
-  </p>
-  <p class="availability">
-    {% if departure.is_sold_out %}
-      <span class="tag tag-full">Sold out</span>
-    {% elif departure.seats_available <= 5 %}
-      <span class="tag tag-low">{{ departure.seats_available }} seats left</span>
-    {% else %}
-      <span class="tag tag-open">Seats available</span>
-    {% endif %}
-    {% if departure.payment_plan_available %}
-      <span class="tag tag-plan">Payment plan available</span>
-    {% endif %}
-  </p>
+{% load humanize ui %}{% trip_photo departure.trip as photo %}
+<article class="trip-card">
+  <div class="trip-card-media">
+    <img src="{{ photo.url }}" alt="{{ photo.alt }}" loading="lazy" width="800" height="533">
+    <p class="trip-card-badge" aria-hidden="true">
+      <span class="month">{{ departure.start_date|date:'M' }}</span>
+      <span class="day">{{ departure.start_date|date:'j' }}</span>
+    </p>
+    <span class="trip-card-category">{{ departure.trip.get_category_display }}</span>
+  </div>
+  <div class="trip-card-body">
+    <h3><a href="{{ departure.get_absolute_url }}">{{ departure.trip.title }}</a></h3>
+    <ul class="trip-card-facts">
+      <li>{% icon "calendar" %}
+        <time datetime="{{ departure.start_date|date:'Y-m-d' }}">{{ departure.start_date|date:'D j M Y' }}</time>{% if departure.duration_days > 1 %}
+          – <time datetime="{{ departure.end_date|date:'Y-m-d' }}">{{ departure.end_date|date:'j M' }}</time>{% endif %}
+      </li>
+      <li>{% icon "clock" %} {% if departure.duration_days > 1 %}{{ departure.duration_days }} days{% else %}Day trip{% endif %}</li>
+      {% if departure.trip.meals_included %}<li>{% icon "utensils" %} {{ departure.trip.meals_included }} meal{{ departure.trip.meals_included|pluralize }}</li>{% endif %}
+    </ul>
+    <p class="trip-card-summary">{{ departure.trip.summary }}</p>
+    <div class="trip-card-foot">
+      <p class="price-from">
+        {% if departure.lead_price %}<small>From</small><strong>${{ departure.lead_price|floatformat:2|intcomma }}</strong> <span>per person</span>{% endif %}
+      </p>
+      <p class="pill-row availability">
+        {% if departure.is_sold_out %}
+          <span class="tag tag-full">Sold out</span>
+        {% elif departure.seats_available <= 5 %}
+          <span class="tag tag-low">Only {{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} left</span>
+        {% else %}
+          <span class="tag tag-open">{% icon "check" %} Seats available</span>
+        {% endif %}
+        {% if departure.payment_plan_available %}
+          <span class="tag tag-plan">{% icon "wallet" %} Payment plan</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
 </article>

@@ -13,9 +13,17 @@ from .models import (
     ItineraryDay,
     PickupPoint,
     PriceOption,
+    SiteImage,
     Trip,
     TripImage,
 )
+
+
+def photo_preview(file, alt: str = "") -> str:
+    """A small thumbnail of a stored photo, for the admin forms and lists."""
+    if not file:
+        return "—"
+    return format_html('<img class="admin-photo-preview" src="{}" alt="{}">', file.url, alt)
 
 
 class ItineraryDayInline(admin.TabularInline):
@@ -23,9 +31,16 @@ class ItineraryDayInline(admin.TabularInline):
     extra = 0
 
 
-class TripImageInline(admin.TabularInline):
+class TripImageInline(admin.StackedInline):
     model = TripImage
     extra = 0
+    fields = (("preview", "image"), ("alt_text", "caption"), "display_order")
+    readonly_fields = ("preview",)
+    verbose_name_plural = "Photo gallery (shown on the trip page, in this order)"
+
+    @admin.display(description="Current photo")
+    def preview(self, obj: TripImage) -> str:
+        return photo_preview(obj.image_card, obj.alt)
 
 
 class DepartureInline(admin.TabularInline):
@@ -38,7 +53,15 @@ class DepartureInline(admin.TabularInline):
 
 @admin.register(Trip)
 class TripAdmin(AuditedAdmin):
-    list_display = ("title", "category", "is_published", "departure_count", "meals_included")
+    list_display = (
+        "thumbnail",
+        "title",
+        "category",
+        "is_published",
+        "departure_count",
+        "meals_included",
+    )
+    list_display_links = ("thumbnail", "title")
     list_filter = ("category", "is_published")
     search_fields = ("title", "summary", "description")
     prepopulated_fields = {"slug": ("title",)}
@@ -46,10 +69,28 @@ class TripAdmin(AuditedAdmin):
     actions = ["publish", "unpublish"]
     fieldsets = (
         (None, {"fields": ("title", "slug", "category", "is_published")}),
-        ("Guest-facing copy", {"fields": ("summary", "description", "hero_image")}),
+        ("Guest-facing copy", {"fields": ("summary", "description")}),
+        (
+            "Main photo",
+            {
+                "fields": ("hero_preview", "hero_image", "hero_image_alt"),
+                "description": "Without a photo the trip shows its category's illustration. "
+                "Add more photos in the gallery further down.",
+            },
+        ),
         ("What's included", {"fields": ("inclusions", "exclusions", "meals_included")}),
         ("Terms", {"fields": ("terms",)}),
     )
+
+    readonly_fields = ("hero_preview",)
+
+    @admin.display(description="Photo")
+    def thumbnail(self, obj: Trip) -> str:
+        return photo_preview(obj.hero_image_card, obj.image_alt)
+
+    @admin.display(description="Current photo")
+    def hero_preview(self, obj: Trip) -> str:
+        return photo_preview(obj.hero_image_card, obj.image_alt)
 
     @admin.display(description="Departures")
     def departure_count(self, obj: Trip) -> int:
@@ -132,10 +173,10 @@ class DepartureAdmin(AuditedAdmin):
         if not obj.pk:
             return "—"
         taken, available = obj.seats_taken, obj.seats_available
-        colour = "#b3261e" if available == 0 else "#1b5e20"
+        state = "sold-out" if available == 0 else "open"
         return format_html(
-            '<span style="color:{}">{} sold · {} left of {}</span>',
-            colour,
+            '<span class="seats seats-{}">{} sold · {} left of {}</span>',
+            state,
             taken,
             available,
             obj.seats_for_sale,
@@ -183,3 +224,21 @@ class PickupPointAdmin(AuditedAdmin):
     list_display = ("name", "city", "region", "is_active")
     list_filter = ("is_active", "region")
     search_fields = ("name", "city", "address")
+
+
+@admin.register(SiteImage)
+class SiteImageAdmin(AuditedAdmin):
+    """Photos for the home page banner and the trip-category tiles."""
+
+    list_display = ("thumbnail", "slot", "alt_text", "updated_at")
+    list_display_links = ("thumbnail", "slot")
+    fields = ("preview", "slot", "image", "alt_text")
+    readonly_fields = ("preview",)
+
+    @admin.display(description="Photo")
+    def thumbnail(self, obj: SiteImage) -> str:
+        return photo_preview(obj.image_card, obj.alt_text)
+
+    @admin.display(description="Current photo")
+    def preview(self, obj: SiteImage) -> str:
+        return photo_preview(obj.image_card, obj.alt_text)

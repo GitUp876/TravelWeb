@@ -1,86 +1,140 @@
 {% extends "base.html" %}
+{% load humanize ui %}
 
-{% block title %}Booking {{ booking.reference }} — {{ site_name }}{% endblock %}
+{% block title %}Booking {{ booking.reference }} · {{ site_name }}{% endblock %}
 
 {% block content %}
-  <h1>Booking {{ booking.reference }}</h1>
-
-  {% if booking.status == "pending" %}
-    <p class="lede">We are confirming your payment. This page updates once Stripe
-      tells us it has gone through, usually within a few seconds — refresh in a moment.</p>
-  {% elif booking.status == "confirmed" %}
-    <p class="lede">Your booking is confirmed. A confirmation email is on its way.</p>
-  {% elif booking.status == "cancelled" %}
-    <p class="lede">This booking has been cancelled. Call us if that is not what you expected.</p>
-  {% else %}
-    <p class="lede">This booking expired before payment was completed, so the seats were released.</p>
-  {% endif %}
-
-  <h2>{{ booking.departure.trip.title }}</h2>
-  <p class="meta">
-    Departs {{ booking.departure.start_date|date:'l j F Y' }}{% if booking.departure.duration_days > 1 %},
-    returns {{ booking.departure.end_date|date:'l j F Y' }}{% endif %}
-  </p>
-
-  <h2>Travelling</h2>
-  <ul class="travellers">
-    {% for traveller in booking.travellers.all %}
-      <li>
-        <strong>{{ traveller.full_name }}</strong> — {{ traveller.price_option.label }}
-        {% if traveller.pickup %}
-          <br>Boards at {{ traveller.pickup.pickup_point.name }},
-          {{ traveller.pickup.pickup_point.city }} at {{ traveller.pickup.boarding_time|time:'g:i a' }}
+  <div class="wrap">
+    <div class="layout">
+      <div class="layout-main">
+        {% if booking.status == "pending" %}
+          <section class="status status-pending">
+            {% icon "hourglass" "icon-xl" %}
+            <div>
+              <h1>Booking {{ booking.reference }}</h1>
+              <p>We are confirming your payment. This page updates once Stripe
+                tells us it has gone through, usually within a few seconds — refresh in a moment.</p>
+            </div>
+          </section>
+        {% elif booking.status == "confirmed" %}
+          <section class="status status-confirmed">
+            {% icon "check-circle" "icon-xl" %}
+            <div>
+              <h1>Booking {{ booking.reference }}</h1>
+              <p>Your booking is confirmed. A confirmation email is on its way.</p>
+            </div>
+          </section>
+        {% elif booking.status == "cancelled" %}
+          <section class="status status-cancelled">
+            {% icon "x" "icon-xl" %}
+            <div>
+              <h1>Booking {{ booking.reference }}</h1>
+              <p>This booking has been cancelled. Call us if that is not what you expected.</p>
+            </div>
+          </section>
+        {% else %}
+          <section class="status status-expired">
+            {% icon "clock" "icon-xl" %}
+            <div>
+              <h1>Booking {{ booking.reference }}</h1>
+              <p>This booking expired before payment was completed, so the seats were released.</p>
+            </div>
+          </section>
         {% endif %}
-      </li>
-    {% endfor %}
-  </ul>
 
-  <h2>Payment</h2>
-  <table class="prices">
-    <tbody>
-      <tr><th scope="row">Total</th><td>${{ booking.total_amount|floatformat:2 }}</td></tr>
-      <tr><th scope="row">Paid</th><td>${{ booking.amount_paid|floatformat:2 }}</td></tr>
-      <tr><th scope="row">Balance</th><td>${{ booking.balance|floatformat:2 }}</td></tr>
-    </tbody>
-  </table>
+        <section aria-labelledby="travelling-title">
+          <h2 id="travelling-title">Who's travelling</h2>
+          <ul class="travellers">
+            {% for traveller in booking.travellers.all %}
+              <li>
+                <span class="avatar" aria-hidden="true">{{ traveller.full_name|make_list|first|upper }}</span>
+                <div>
+                  <strong>{{ traveller.full_name }}</strong> — {{ traveller.price_option.label }}
+                  {% if traveller.pickup %}
+                    <p class="meta">{% icon "map-pin" %} Boards at {{ traveller.pickup.pickup_point.name }},
+                      {{ traveller.pickup.pickup_point.city }} at <strong>{{ traveller.pickup.boarding_time|time:'g:i a' }}</strong></p>
+                  {% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
 
-  {% if can_pay_balance %}
-    <form class="pay-balance" method="post" action="{% url 'bookings:pay-balance' token=token %}">
-      {% csrf_token %}
-      <button type="submit">Pay the ${{ booking.balance|floatformat:2 }} balance now</button>
-    </form>
-    <p class="note">
-      You pay on Stripe's own page; we never see your card.
-      {% if booking.payment_plan %}Paying now cancels the instalments still to come.{% endif %}
-    </p>
-  {% endif %}
+        {% if booking.payment_plan %}
+          <section aria-labelledby="plan-title">
+            <h2 id="plan-title">Payment plan</h2>
+            <p class="meta">
+              A ${{ booking.payment_plan.deposit_amount|floatformat:2|intcomma }} deposit plus
+              {{ booking.payment_plan.instalment_count }}
+              instalment{{ booking.payment_plan.instalment_count|pluralize }}.
+            </p>
+            <table class="instalments">
+              <thead>
+                <tr><th scope="col">Due</th><th scope="col">Amount</th><th scope="col">Status</th></tr>
+              </thead>
+              <tbody>
+                {% for instalment in booking.payment_plan.instalments.all %}
+                  <tr>
+                    <td>{{ instalment.due_date|date:'j F Y' }}</td>
+                    <td>${{ instalment.amount|floatformat:2|intcomma }}</td>
+                    <td><span class="tag {% if instalment.status == 'paid' %}tag-open{% elif instalment.status == 'failed' %}tag-full{% else %}tag-neutral{% endif %}">{{ instalment.get_status_display }}</span></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p class="note">
+              Each instalment is charged automatically to the card you paid your deposit with.
+              We email you if a charge does not go through.
+            </p>
+          </section>
+        {% endif %}
 
-  {% if booking.payment_plan %}
-    <h2>Payment plan</h2>
-    <p class="meta">
-      A ${{ booking.payment_plan.deposit_amount|floatformat:2 }} deposit plus
-      {{ booking.payment_plan.instalment_count }}
-      instalment{{ booking.payment_plan.instalment_count|pluralize }}.
-    </p>
-    <table class="instalments">
-      <thead>
-        <tr><th scope="col">Due</th><th scope="col">Amount</th><th scope="col">Status</th></tr>
-      </thead>
-      <tbody>
-        {% for instalment in booking.payment_plan.instalments.all %}
-          <tr>
-            <td>{{ instalment.due_date|date:'j F Y' }}</td>
-            <td>${{ instalment.amount|floatformat:2 }}</td>
-            <td>{{ instalment.get_status_display }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <p class="note">
-      Each instalment is charged automatically to the card you paid your deposit with.
-      We email you if a charge does not go through.
-    </p>
-  {% endif %}
+        <p class="note">{% icon "lock" %} Keep this page's link to yourself — anyone who has it can see this booking.</p>
+      </div>
 
-  <p class="note">Keep this page's link to yourself — anyone who has it can see this booking.</p>
+      <aside class="aside-sticky" aria-label="Trip and payment">
+        {% with trip=booking.departure.trip %}
+          {% trip_photo trip as photo %}
+          <div class="card summary-card">
+            <img src="{{ photo.url }}" alt="{{ photo.alt }}" width="800" height="450">
+            <div class="summary-body">
+              <p><span class="ref">{% icon "ticket" %} {{ booking.reference }}</span></p>
+              <h2>{{ trip.title }}</h2>
+              <p class="meta">
+                {% icon "calendar" %} Departs {{ booking.departure.start_date|date:'l j F Y' }}{% if booking.departure.duration_days > 1 %},
+                returns {{ booking.departure.end_date|date:'l j F Y' }}{% endif %}
+              </p>
+            </div>
+          </div>
+        {% endwith %}
+
+        <div class="book-panel">
+          <h2>Payment</h2>
+          <table class="price-table prices">
+            <tbody>
+              <tr><th scope="row">Total</th><td>${{ booking.total_amount|floatformat:2|intcomma }}</td></tr>
+              <tr><th scope="row">Paid</th><td>${{ booking.amount_paid|floatformat:2|intcomma }}</td></tr>
+              <tr class="total"><th scope="row">Balance</th><td>${{ booking.balance|floatformat:2|intcomma }}</td></tr>
+            </tbody>
+          </table>
+          {% if booking.total_amount %}
+            <progress class="paid-progress" max="{{ booking.total_amount|stringformat:'s' }}" value="{{ booking.amount_paid|stringformat:'s' }}">
+              ${{ booking.amount_paid|floatformat:2|intcomma }} of ${{ booking.total_amount|floatformat:2|intcomma }} paid
+            </progress>
+          {% endif %}
+
+          {% if can_pay_balance %}
+            <form class="pay-balance" method="post" action="{% url 'bookings:pay-balance' token=token %}">
+              {% csrf_token %}
+              <button type="submit" class="primary btn-block">Pay the ${{ booking.balance|floatformat:2|intcomma }} balance now</button>
+            </form>
+            <p class="note">
+              You pay on Stripe's own page; we never see your card.
+              {% if booking.payment_plan %}Paying now cancels the instalments still to come.{% endif %}
+            </p>
+          {% endif %}
+        </div>
+      </aside>
+    </div>
+  </div>
 {% endblock %}

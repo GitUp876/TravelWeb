@@ -151,7 +151,12 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Staff-uploaded photos. In production point this at a persistent disk (the
+# container's own filesystem is wiped on every deploy).
+MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT") or BASE_DIR / "media")
+
+# Largest photo staff may upload. Every accepted photo is re-encoded smaller.
+IMAGE_UPLOAD_MAX_BYTES = int(env("IMAGE_UPLOAD_MAX_BYTES", str(10 * 1024 * 1024)))
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
@@ -168,6 +173,10 @@ DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", "bookings@example.com")
 SITE_NAME = env("SITE_NAME", "Group Tours")
 SITE_TAGLINE = env("SITE_TAGLINE", "Escorted trips, day tours and getaways")
 ADMIN_URL = env("DJANGO_ADMIN_URL", "staff/")
+# Shown in the header and footer, and wherever a page says "call us". Leave
+# blank to hide them.
+SITE_PHONE = env("SITE_PHONE", "")
+SITE_EMAIL = env("SITE_EMAIL", "")
 
 # How long a booking may hold seats before they are released back to the pool.
 SEAT_HOLD_MINUTES = int(env("SEAT_HOLD_MINUTES", "20"))

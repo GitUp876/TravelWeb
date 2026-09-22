@@ -1,19 +1,31 @@
 {% extends "base.html" %}
+{% load ui %}
 
-{% block title %}Find your booking — {{ site_name }}{% endblock %}
+{% block title %}Find your booking · {{ site_name }}{% endblock %}
 
 {% block content %}
-  <h1>Find your booking</h1>
-  {% if sent %}
-    <p class="lede">If those details match a booking, the link is on its way to that
-      email address. It is worth checking your spam folder.</p>
-  {% else %}
-    <p class="lede">Give us the reference from your confirmation and the email address
-      it was sent to, and we will email you the link to your booking.</p>
-    <form method="post" class="booking-form">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit" class="primary">Email me the link</button>
-    </form>
-  {% endif %}
+  <div class="wrap">
+    <div class="center-card">
+      <div class="badge-icon">{% icon "ticket" "icon-xl" %}</div>
+      <h1>Find your booking</h1>
+      {% if sent %}
+        <div class="card">
+          <p class="lede">If those details match a booking, the link is on its way to that
+            email address. It is worth checking your spam folder.</p>
+          <p class="note">{% icon "clock" %} For your security the link works for a limited time. You can ask for a new one whenever you need it.</p>
+        </div>
+      {% else %}
+        <p class="lede">Give us the reference from your confirmation and the email address
+          it was sent to, and we will email you the link to your booking.</p>
+        <div class="card">
+          <form method="post" class="booking-form">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="primary btn-block">{% icon "mail" %} Email me the link</button>
+          </form>
+        </div>
+        <p class="note">{% icon "lock" %} We never show booking details on this page, only by email to the address on the booking.</p>
+      {% endif %}
+    </div>
+  </div>
 {% endblock %}

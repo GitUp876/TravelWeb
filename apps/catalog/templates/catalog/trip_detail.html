@@ -1,49 +1,174 @@
 {% extends "base.html" %}
+{% load humanize ui %}
 
-{% block title %}{{ trip.title }} — {{ site_name }}{% endblock %}
+{% block title %}{{ trip.title }} · {{ site_name }}{% endblock %}
 {% block description %}{{ trip.summary }}{% endblock %}
 
 {% block content %}
+  {% trip_photo trip "full" as hero %}
+  {% with next=departures.0 photos=trip.images.all %}
   <article>
-    <h1>{{ trip.title }}</h1>
-    <p class="lede">{{ trip.summary }}</p>
-
-    {% if trip.hero_image %}
-      <img class="hero-image" src="{{ trip.hero_image.url }}" alt="{{ trip.title }}">
-    {% endif %}
-
-    <div class="prose">{{ trip.description|linebreaks }}</div>
-
-    {% if trip.itinerary_days.all %}
-      <h2>Itinerary</h2>
-      <ol class="itinerary">
-        {% for day in trip.itinerary_days.all %}
-          <li>
-            <h3>Day {{ day.day_number }}: {{ day.title }}</h3>
-            {{ day.description|linebreaks }}
-          </li>
-        {% endfor %}
-      </ol>
-    {% endif %}
-
-    {% if trip.inclusion_lines %}
-      <h2>What's included</h2>
-      <ul>{% for item in trip.inclusion_lines %}<li>{{ item }}</li>{% endfor %}</ul>
-    {% endif %}
-    {% if trip.exclusion_lines %}
-      <h2>Not included</h2>
-      <ul>{% for item in trip.exclusion_lines %}<li>{{ item }}</li>{% endfor %}</ul>
-    {% endif %}
-
-    <h2>Dates</h2>
-    {% if departures %}
-      <div class="grid">
-        {% for departure in departures %}
-          {% include "catalog/_departure_card.html" %}
-        {% endfor %}
+    <section class="page-banner">
+      <img src="{{ hero.url }}" alt="{{ hero.alt }}" width="2000" height="1125" fetchpriority="high">
+      <div class="wrap page-banner-content">
+        <ol class="breadcrumb">
+          <li><a href="{% url 'catalog:home' %}">Home</a></li>
+          <li><a href="{% url 'catalog:category' trip.category %}">{{ trip.get_category_display }}</a></li>
+        </ol>
+        <h1>{{ trip.title }}</h1>
+        <p class="lede">{{ trip.summary }}</p>
+        <p class="pill-row">
+          <span class="tag tag-neutral">{% icon "compass" %} {{ trip.get_category_display }}</span>
+          {% if next %}<span class="tag tag-neutral">{% icon "clock" %} {% if next.duration_days > 1 %}{{ next.duration_days }} days{% else %}Day trip{% endif %}</span>{% endif %}
+          {% if trip.meals_included %}<span class="tag tag-neutral">{% icon "utensils" %} {{ trip.meals_included }} meal{{ trip.meals_included|pluralize }}</span>{% endif %}
+          {% if photos %}<span class="tag tag-neutral">{% icon "image" %} {{ photos|length }} photo{{ photos|length|pluralize }}</span>{% endif %}
+        </p>
       </div>
-    {% else %}
-      <p class="empty">No dates on sale at the moment.</p>
-    {% endif %}
+    </section>
+
+    <div class="wrap layout">
+      <div class="layout-main">
+        <section aria-labelledby="overview-title">
+          <h2 id="overview-title" class="visually-hidden">Overview</h2>
+          <div class="prose prose-lead">{{ trip.description|linebreaks }}</div>
+        </section>
+
+        {% if photos %}
+          <section aria-labelledby="gallery-title" id="gallery">
+            <h2 id="gallery-title">Photos</h2>
+            <ul class="gallery">
+              {% for photo in photos %}
+                <li>
+                  <a href="#photo-{{ forloop.counter }}">
+                    <img src="{{ photo.card_url }}" alt="{{ photo.alt }}" loading="lazy" width="800" height="533">
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+            {% for photo in photos %}
+              <figure class="lightbox" id="photo-{{ forloop.counter }}" aria-label="Photo {{ forloop.counter }} of {{ photos|length }}">
+                <div class="lightbox-bar">
+                  <span>{{ forloop.counter }} / {{ photos|length }}</span>
+                  <span class="lightbox-nav">
+                    {% if not forloop.first %}<a class="lb-btn" href="#photo-{{ forloop.counter0 }}">{% icon "arrow-left" %} Previous</a>{% endif %}
+                    {% if not forloop.last %}<a class="lb-btn" href="#photo-{{ forloop.counter|add:1 }}">Next {% icon "arrow-right" %}</a>{% endif %}
+                    <a class="lb-btn" href="#gallery">{% icon "x" %} Close</a>
+                  </span>
+                </div>
+                <img src="{{ photo.image.url }}" alt="{{ photo.alt }}" loading="lazy">
+                {% if photo.caption %}<figcaption>{{ photo.caption }}</figcaption>{% endif %}
+              </figure>
+            {% endfor %}
+          </section>
+        {% endif %}
+
+        {% if trip.itinerary_days.all %}
+          <section aria-labelledby="itinerary-title">
+            <h2 id="itinerary-title">Your itinerary</h2>
+            <ol class="timeline">
+              {% for day in trip.itinerary_days.all %}
+                <li>
+                  <span class="timeline-day" aria-hidden="true">{{ day.day_number }}</span>
+                  <h3><small>Day {{ day.day_number }}</small>{{ day.title }}</h3>
+                  {{ day.description|linebreaks }}
+                </li>
+              {% endfor %}
+            </ol>
+          </section>
+        {% endif %}
+
+        {% if trip.inclusion_lines or trip.exclusion_lines %}
+          <section aria-labelledby="included-title">
+            <h2 id="included-title">What's included</h2>
+            <div class="inclusions">
+              {% if trip.inclusion_lines %}
+                <div>
+                  <h3>Included in the price</h3>
+                  <ul class="ticklist">{% for item in trip.inclusion_lines %}<li>{% icon "check" %} <span>{{ item }}</span></li>{% endfor %}</ul>
+                </div>
+              {% endif %}
+              {% if trip.exclusion_lines %}
+                <div>
+                  <h3>Not included</h3>
+                  <ul class="crosslist">{% for item in trip.exclusion_lines %}<li>{% icon "x" %} <span>{{ item }}</span></li>{% endfor %}</ul>
+                </div>
+              {% endif %}
+            </div>
+          </section>
+        {% endif %}
+
+        <section id="dates" aria-labelledby="dates-title">
+          <h2 id="dates-title">Dates and prices</h2>
+          {% if departures %}
+            <ul class="dates">
+              {% for departure in departures %}
+                <li class="date-row">
+                  <p class="date-chip" aria-hidden="true">
+                    <span class="month">{{ departure.start_date|date:'M' }}</span>
+                    <span class="day">{{ departure.start_date|date:'j' }}</span>
+                    <span class="year">{{ departure.start_date|date:'Y' }}</span>
+                  </p>
+                  <div>
+                    <h3>
+                      <time datetime="{{ departure.start_date|date:'Y-m-d' }}">{{ departure.start_date|date:'l j F Y' }}</time>{% if departure.duration_days > 1 %}
+                        to <time datetime="{{ departure.end_date|date:'Y-m-d' }}">{{ departure.end_date|date:'l j F' }}</time>{% endif %}
+                    </h3>
+                    <p class="meta">
+                      {% if departure.duration_days > 1 %}{{ departure.duration_days }} days{% else %}Day trip{% endif %}
+                      {% with n=departure.pickups.all|length %}{% if n %} · {{ n }} pickup point{{ n|pluralize }}{% endif %}{% endwith %}
+                    </p>
+                    <p class="pill-row">
+                      {% if departure.is_sold_out %}
+                        <span class="tag tag-full">Sold out</span>
+                      {% elif departure.seats_available <= 5 %}
+                        <span class="tag tag-low">Only {{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} left</span>
+                      {% else %}
+                        <span class="tag tag-open">{% icon "check" %} Seats available</span>
+                      {% endif %}
+                      {% if departure.payment_plan_available %}<span class="tag tag-plan">{% icon "wallet" %} Payment plan</span>{% endif %}
+                    </p>
+                  </div>
+                  <div class="date-row-cta">
+                    <p class="price-from">
+                      {% if departure.lead_price %}<small>From</small><strong>${{ departure.lead_price|floatformat:2|intcomma }}</strong>{% endif %}
+                    </p>
+                    <a class="btn btn-primary btn-sm" href="{{ departure.get_absolute_url }}">View and book<span class="visually-hidden"> {{ departure.start_date|date:'j F Y' }}</span></a>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="card"><p class="empty">No dates on sale at the moment.</p></div>
+          {% endif %}
+        </section>
+      </div>
+
+      <aside class="aside-sticky" aria-label="Booking">
+        <div class="book-panel">
+          {% if next %}
+            <p class="price-from">
+              {% if next.lead_price %}<small>From</small><strong>${{ next.lead_price|floatformat:2|intcomma }}</strong> <span>per person</span>{% endif %}
+            </p>
+            <dl>
+              <div><dt>{% icon "calendar" %} Next date</dt><dd>{{ next.start_date|date:'j M Y' }}</dd></div>
+              <div><dt>{% icon "route" %} Dates on sale</dt><dd>{{ departures|length }}</dd></div>
+              {% if trip.meals_included %}<div><dt>{% icon "utensils" %} Meals</dt><dd>{{ trip.meals_included }}</dd></div>{% endif %}
+            </dl>
+            <a class="btn btn-primary btn-lg btn-block" href="#dates">Choose a date</a>
+            <p class="note">Prices are per person. Pickup points and times are shown for each date.</p>
+          {% else %}
+            <h2>No dates on sale</h2>
+            <p class="note">New dates are added through the year.{% if site_phone %} Call us to hear first.{% endif %}</p>
+          {% endif %}
+        </div>
+        {% if site_phone %}
+          <div class="help-card">
+            <strong>{% icon "phone" %} Rather talk it through?</strong>
+            <p>Call <a href="tel:{{ site_phone_href }}">{{ site_phone }}</a> and we'll help you choose.</p>
+          </div>
+        {% endif %}
+      </aside>
+    </div>
   </article>
+  {% endwith %}
 {% endblock %}

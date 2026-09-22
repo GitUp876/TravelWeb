@@ -11,11 +11,22 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
-from apps.core.models import TimeStampedModel
+from apps.core.images import validate_image_upload
+from apps.core.models import ProcessedImagesMixin, TimeStampedModel
+
+PHOTO_HELP = (
+    "A JPEG, PNG or WebP photo, landscape, at least 1600 pixels wide for the sharpest "
+    "result. It is resized automatically and its location data is removed."
+)
+ALT_HELP = (
+    "Describe the photo in a few words for people using screen readers, "
+    "e.g. 'The Breakers mansion seen from the lawn'."
+)
 
 
 class TripCategory(models.TextChoices):
@@ -32,8 +43,10 @@ class PublishedTripManager(models.Manager):
         return super().get_queryset().filter(is_published=True)
 
 
-class Trip(TimeStampedModel):
+class Trip(ProcessedImagesMixin, TimeStampedModel):
     """A tour as it is described to guests, independent of any date."""
+
+    IMAGE_FIELDS = {"hero_image": "hero_image_card"}
 
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
@@ -46,7 +59,17 @@ class Trip(TimeStampedModel):
     )
     meals_included = models.PositiveSmallIntegerField(default=0)
     terms = models.TextField(blank=True, help_text="Booking terms shown before payment.")
-    hero_image = models.ImageField(upload_to="trips/", blank=True)
+    hero_image = models.ImageField(
+        "main photo",
+        upload_to="trips/",
+        blank=True,
+        validators=[validate_image_upload],
+        help_text=PHOTO_HELP + " Shown at the top of the trip page and on listings.",
+    )
+    hero_image_alt = models.CharField(
+        "main photo description", max_length=200, blank=True, help_text=ALT_HELP
+    )
+    hero_image_card = models.ImageField(upload_to="trips/cards/", blank=True, editable=False)
     is_published = models.BooleanField(
         default=False,
         help_text="Unpublished trips are invisible to guests, dates and all.",
@@ -90,6 +113,15 @@ class Trip(TimeStampedModel):
     def upcoming_departures(self):
         return self.departures.bookable().order_by("start_date")
 
+    @property
+    def placeholder_image_url(self) -> str:
+        """The stand-in illustration for this trip's category."""
+        return static(f"img/placeholders/{self.category}.svg")
+
+    @property
+    def image_alt(self) -> str:
+        return self.hero_image_alt or self.title
+
 
 class ItineraryDay(models.Model):
     """One day of a trip's published itinerary."""
@@ -109,17 +141,75 @@ class ItineraryDay(models.Model):
         return f"Day {self.day_number}: {self.title}"
 
 
-class TripImage(models.Model):
+class TripImage(ProcessedImagesMixin, models.Model):
+    """One photo in a trip's gallery."""
+
+    IMAGE_FIELDS = {"image": "image_card"}
+
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="images")
-    image = models.ImageField(upload_to="trips/")
-    caption = models.CharField(max_length=200, blank=True)
+    image = models.ImageField(
+        "photo", upload_to="trips/", validators=[validate_image_upload], help_text=PHOTO_HELP
+    )
+    image_card = models.ImageField(upload_to="trips/cards/", blank=True, editable=False)
+    alt_text = models.CharField("description", max_length=200, blank=True, help_text=ALT_HELP)
+    caption = models.CharField(
+        max_length=200, blank=True, help_text="Optional line shown under the photo."
+    )
     display_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         ordering = ["display_order", "id"]
+        verbose_name = "gallery photo"
 
     def __str__(self) -> str:
-        return self.caption or f"Image {self.pk}"
+        return self.caption or self.alt_text or f"Photo {self.pk}"
+
+    @property
+    def alt(self) -> str:
+        return self.alt_text or self.caption or self.trip.title
+
+    @property
+    def card_url(self) -> str:
+        return (self.image_card or self.image).url
+
+
+class SiteImage(ProcessedImagesMixin, TimeStampedModel):
+    """A photo for a fixed place on the public site: the home page banner, or
+    the picture that stands for a trip category.
+
+    Every slot has a built-in illustration, so the site looks finished before
+    any of these exist; uploading one simply replaces the illustration.
+    """
+
+    class Slot(models.TextChoices):
+        HOME_HERO = "home_hero", "Home page banner"
+        DAY_TRIP = TripCategory.DAY_TRIP.value, "Category: " + TripCategory.DAY_TRIP.label
+        OVERNIGHT = TripCategory.OVERNIGHT.value, "Category: " + TripCategory.OVERNIGHT.label
+        THEATRE = TripCategory.THEATRE.value, "Category: " + TripCategory.THEATRE.label
+        LUNCHEON = TripCategory.LUNCHEON.value, "Category: " + TripCategory.LUNCHEON.label
+        CRUISE = TripCategory.CRUISE.value, "Category: " + TripCategory.CRUISE.label
+        FLY = TripCategory.FLY.value, "Category: " + TripCategory.FLY.label
+
+    IMAGE_FIELDS = {"image": "image_card"}
+
+    slot = models.CharField(max_length=20, choices=Slot.choices, unique=True)
+    image = models.ImageField(
+        "photo", upload_to="site/", validators=[validate_image_upload], help_text=PHOTO_HELP
+    )
+    image_card = models.ImageField(upload_to="site/cards/", blank=True, editable=False)
+    alt_text = models.CharField("description", max_length=200, help_text=ALT_HELP)
+
+    class Meta:
+        ordering = ["slot"]
+        verbose_name = "site photo"
+
+    def __str__(self) -> str:
+        return self.get_slot_display()
+
+    @staticmethod
+    def placeholder_url(slot: str) -> str:
+        name = "hero" if slot == SiteImage.Slot.HOME_HERO else slot
+        return static(f"img/placeholders/{name}.svg")
 
 
 class PickupPoint(TimeStampedModel):

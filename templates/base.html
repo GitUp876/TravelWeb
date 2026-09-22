@@ -1,42 +1,112 @@
-{% load static %}<!doctype html>
+{% load static ui %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ site_name }}{% endblock %}</title>
+  <title>{% block title %}{{ site_name }} · {{ site_tagline }}{% endblock %}</title>
   <meta name="description" content="{% block description %}{{ site_tagline }}{% endblock %}">
+  <meta name="theme-color" content="#0e4a55">
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="preload" href="{% static 'fonts/figtree-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'fonts/fraunces-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
+
+  {% if site_phone or site_email %}
+    <div class="topbar">
+      <div class="wrap topbar-inner">
+        <span class="topbar-item">{% icon "users" %} Escorted group travel, planned for you</span>
+        <span class="topbar-item">
+          {% if site_phone %}{% icon "phone" %} Questions? Call <a href="tel:{{ site_phone_href }}">{{ site_phone }}</a>
+          {% else %}{% icon "mail" %} <a href="mailto:{{ site_email }}">{{ site_email }}</a>{% endif %}
+        </span>
+      </div>
+    </div>
+  {% endif %}
+
   <header class="site-header">
     <div class="wrap header-inner">
-      <a class="brand" href="{% url 'catalog:home' %}">{{ site_name }}</a>
-      <nav aria-label="Trip categories">
+      <a class="brand" href="{% url 'catalog:home' %}">
+        <img class="brand-mark" src="{% static 'img/logo-mark.svg' %}" alt="" width="44" height="44">
+        <span class="brand-name">{{ site_name }}<span class="brand-tag">{{ site_tagline }}</span></span>
+      </a>
+
+      <nav class="nav-desktop" aria-label="Trip types">
         <ul class="nav">
           {% for category in categories %}
-            <li><a href="{% url 'catalog:category' category.value %}">{{ category.label }}</a></li>
+            <li><a href="{% url 'catalog:category' category.value %}"{% if category.value == category_value %} aria-current="page"{% endif %}>{{ category.label }}</a></li>
           {% endfor %}
         </ul>
       </nav>
+      <a class="btn btn-sm header-cta" href="{% url 'bookings:find' %}">{% icon "ticket" %} My booking</a>
+
+      <details class="nav-mobile">
+        <summary>{% icon "menu" %} Menu</summary>
+        <nav class="nav-mobile-panel" aria-label="Site">
+          <ul>
+            {% for category in categories %}
+              <li><a href="{% url 'catalog:category' category.value %}">{% icon category.icon %} {{ category.label }}</a></li>
+            {% endfor %}
+          </ul>
+          <a class="btn btn-block" href="{% url 'bookings:find' %}">{% icon "ticket" %} Find my booking</a>
+        </nav>
+      </details>
     </div>
   </header>
 
-  <main id="main" class="wrap">
+  <main id="main">
     {% if messages %}
-      <ul class="messages" role="status">
-        {% for message in messages %}
-          <li class="message message-{{ message.tags }}">{{ message }}</li>
-        {% endfor %}
-      </ul>
+      <div class="wrap">
+        <ul class="messages" role="status">
+          {% for message in messages %}
+            <li class="message message-{{ message.tags }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endif %}
     {% block content %}{% endblock %}
   </main>
 
   <footer class="site-footer">
-    <div class="wrap">
-      <p>{{ site_name }} — {{ site_tagline }}</p>
-      <p><a href="{% url 'bookings:find' %}">Find your booking</a></p>
+    <div class="footer-top">
+      <div class="wrap footer-grid">
+        <div>
+          <a class="brand" href="{% url 'catalog:home' %}">
+            <img class="brand-mark" src="{% static 'img/logo-mark.svg' %}" alt="" width="44" height="44">
+            <span class="brand-name">{{ site_name }}<span class="brand-tag">{{ site_tagline }}</span></span>
+          </a>
+          <p>Day trips, theatre coaches and escorted tours with a friendly tour director, pickups close to home and nothing to organise but your suitcase.</p>
+        </div>
+        <div>
+          <h2>Explore</h2>
+          <ul>
+            {% for category in categories %}
+              <li><a href="{% url 'catalog:category' category.value %}">{{ category.label }}</a></li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div>
+          <h2>Your booking</h2>
+          <ul>
+            <li><a href="{% url 'bookings:find' %}">Find your booking</a></li>
+            <li><a href="{% url 'bookings:find' %}">Pay a balance</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Talk to us</h2>
+          <ul>
+            {% if site_phone %}<li>{% icon "phone" %} <a href="tel:{{ site_phone_href }}">{{ site_phone }}</a></li>{% endif %}
+            {% if site_email %}<li>{% icon "mail" %} <a href="mailto:{{ site_email }}">{{ site_email }}</a></li>{% endif %}
+            <li>{% icon "lock" %} Card payments by Stripe</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; {% now "Y" %} {{ site_name }}</span>
+      <span>{% icon "shield" %} Secure checkout. We never see or store your card.</span>
     </div>
   </footer>
 </body>

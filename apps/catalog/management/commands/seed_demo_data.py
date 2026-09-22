@@ -29,6 +29,63 @@ PICKUPS = [
 ]
 
 
+# Shorter demo trips so every category has something on sale.
+MORE_TRIPS = [
+    {
+        "title": "Broadway Matinee: The Great Gatsby",
+        "category": TripCategory.THEATRE,
+        "summary": "Orchestra seats for the Saturday matinee, with time for lunch in Midtown.",
+        "description": "Door-to-door coach travel to Manhattan, free time for lunch near "
+        "Times Square and orchestra seats for the 2pm performance.",
+        "inclusions": "Motorcoach travel\nOrchestra seat\nTour escort",
+        "days_out": 30,
+        "length": 1,
+        "prices": [("Adult", "189.00")],
+    },
+    {
+        "title": "Big Band Luncheon at the Aqua Turf",
+        "category": TripCategory.LUNCHEON,
+        "summary": "A three-course lunch and a live big band show in Plantsville.",
+        "description": "Swing the afternoon away with a three-course lunch and a live show "
+        "by a sixteen-piece big band.",
+        "inclusions": "Motorcoach travel\nThree-course lunch\nLive show",
+        "meals": 1,
+        "days_out": 21,
+        "length": 1,
+        "prices": [("Adult", "119.00")],
+    },
+    {
+        "title": "Bermuda Cruise from Boston",
+        "category": TripCategory.CRUISE,
+        "summary": "Seven nights to King's Wharf, with coach transfers to and from the port.",
+        "description": "Sail from Boston to Bermuda's pink-sand beaches with three full days "
+        "docked at King's Wharf. Coach transfers and a host who travels with the group.",
+        "inclusions": "Coach transfers to the port\nSeven nights' cruise\nAll meals on board",
+        "exclusions": "Gratuities\nShore excursions",
+        "meals": 21,
+        "days_out": 150,
+        "length": 8,
+        "prices": [("Inside cabin", "1695.00"), ("Balcony cabin", "2295.00")],
+        "deposit": "250.00",
+    },
+    {
+        "title": "Ireland's Emerald Coast",
+        "category": TripCategory.FLY,
+        "summary": "Ten days from Dublin to Galway and the Ring of Kerry, flights included.",
+        "description": "Fly overnight to Dublin, then travel the west coast by coach with a "
+        "local guide: the Cliffs of Moher, Galway, Killarney and the Ring of Kerry.",
+        "inclusions": "Return flights from Boston\nNine nights' hotels\nDaily breakfast\n"
+        "Five dinners\nLocal guide throughout",
+        "exclusions": "Travel insurance\nLunches",
+        "meals": 14,
+        "days_out": 220,
+        "length": 10,
+        "prices": [("Double occupancy", "3895.00"), ("Single occupancy", "4695.00")],
+        "deposit": "500.00",
+    },
+]
+
+
 class Command(BaseCommand):
     help = "Creates demo trips, departures, pickup points and prices."
 
@@ -51,6 +108,8 @@ class Command(BaseCommand):
         today = timezone.localdate()
         self._day_trip(points, today)
         self._overnight(points, today)
+        for spec in MORE_TRIPS:
+            self._simple_trip(points, today, **spec)
         self.stdout.write(self.style.SUCCESS("Demo data ready. Visit / to see it."))
 
     def _day_trip(self, points: list[PickupPoint], today: date) -> None:
@@ -173,5 +232,45 @@ class Command(BaseCommand):
                     departure=departure,
                     pickup_point=point,
                     boarding_time=boarding,
+                    display_order=order,
+                )
+
+    def _simple_trip(self, points, today, **spec) -> None:
+        trip, _ = Trip.objects.get_or_create(
+            title=spec["title"],
+            defaults={
+                "category": spec["category"],
+                "summary": spec["summary"],
+                "description": spec["description"],
+                "inclusions": spec.get("inclusions", ""),
+                "exclusions": spec.get("exclusions", "Gratuities"),
+                "meals_included": spec.get("meals", 0),
+                "is_published": True,
+            },
+        )
+        start = today + timedelta(days=spec["days_out"])
+        deposit = Decimal(spec.get("deposit", "0.00"))
+        departure, created = Departure.objects.get_or_create(
+            trip=trip,
+            start_date=start,
+            defaults={
+                "end_date": start + timedelta(days=spec["length"] - 1),
+                "status": Departure.Status.OPEN,
+                "capacity": 48,
+                "deposit_amount": deposit,
+                "final_payment_due_date": (start - timedelta(days=45)) if deposit else None,
+                "cancellation_policy": "Full refund up to 30 days before departure.",
+            },
+        )
+        if created:
+            for order, (label, amount) in enumerate(spec["prices"]):
+                PriceOption.objects.create(
+                    departure=departure, label=label, amount=Decimal(amount), display_order=order
+                )
+            for order, point in enumerate(points[:2]):
+                DeparturePickup.objects.create(
+                    departure=departure,
+                    pickup_point=point,
+                    boarding_time=time(7 + order, 0),
                     display_order=order,
                 )

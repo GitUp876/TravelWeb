@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load ui %}
+
+{% block title %}Page not found · {{ site_name }}{% endblock %}
+
+{% block content %}
+  <div class="wrap">
+    <div class="center-card">
+      <div class="badge-icon">{% icon "compass" "icon-xl" %}</div>
+      <h1>We can't find that page</h1>
+      <p class="lede">It may have moved, or the trip may no longer be on sale. Let's get you back on the road.</p>
+      <p class="hero-actions">
+        <a class="btn btn-primary" href="{% url 'catalog:home' %}">See upcoming trips</a>
+        <a class="btn" href="{% url 'bookings:find' %}">Find my booking</a>
+      </p>
+    </div>
+  </div>
+{% endblock %}

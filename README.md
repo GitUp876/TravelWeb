@@ -71,6 +71,40 @@ Built in phase 3 so far:
 
 That completes the phase 3 scope.
 
+Design refresh:
+
+- A new look across the public site and the staff admin: deep sea teal, a
+  sunrise coral for the next thing to do, warm sand underneath, with Fraunces
+  for headings and Figtree for text. Both fonts are open-source (SIL OFL, the
+  licences sit next to the files in `static/fonts/`) and served from our own
+  origin. Body text is 17px and every text colour pairing meets WCAG AA.
+- Photos staff manage in the admin: a main photo per trip, a photo gallery per
+  trip (with a lightbox that needs no JavaScript), and "Site photos" for the
+  home page banner and each trip category. Every slot has a built-in
+  illustration in `static/img/placeholders/`, so nothing looks empty before
+  real photography is uploaded.
+
+## Photos
+
+Staff upload photos on the trip form (main photo and gallery) and under
+**Site photos** (home page banner, one per trip category). Each upload is
+checked and rewritten before it is stored — see `apps/core/images.py`:
+
+- JPEG, PNG or WebP only, judged by the file's contents rather than its name.
+  SVG is refused because it can carry script. Uploads over
+  `IMAGE_UPLOAD_MAX_BYTES` (10 MB by default), over 40 megapixels, or under
+  640×400 are refused before anything is decoded.
+- Every accepted photo is decoded and saved again as a fresh JPEG under a
+  random name, in a full size (2000px) and a card size (800px). That strips
+  EXIF, including the GPS position phone cameras record.
+- Only file names of exactly that shape are ever served from `/media/`, with a
+  sandboxing content security policy of their own, and a replaced or deleted
+  photo's files are removed from disk.
+
+In production, point `DJANGO_MEDIA_ROOT` at a persistent disk (on Render, a
+mounted disk owned by the `app` user). The container's own filesystem is
+replaced on every deploy, so photos stored there would disappear.
+
 ## How paying works
 
 1. The guest fills in the booking form. Nothing is charged and no card is
@@ -163,7 +197,7 @@ missing.
 
 ```
 config/settings/     base, dev, test and prod settings
-apps/core/           audit trail, security headers, the MFA admin site
+apps/core/           audit trail, security headers, the MFA admin site, photo checks
 apps/accounts/       staff users, roles, the setup_mfa command
 apps/catalog/        trips, departures, prices, pickups, public pages
 apps/bookings/       guests, bookings, travellers, the public booking flow
