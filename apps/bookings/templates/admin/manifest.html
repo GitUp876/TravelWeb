@@ -1,0 +1,81 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <style>
+    .manifest-group { margin-bottom: 1.5em; }
+    .manifest-note { font-size: 0.9em; }
+    @media print {
+      #header, #nav-sidebar, .breadcrumbs, .manifest-tools, #footer { display: none !important; }
+      .manifest-group { page-break-inside: avoid; }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <h1>{{ departure.trip.title }}</h1>
+  <p class="help">
+    {{ departure.start_date|date:'l j F Y' }}{% if departure.duration_days > 1 %}
+      – {{ departure.end_date|date:'l j F Y' }}{% endif %}
+    · {{ headcount }} travelling of {{ capacity }} seats
+  </p>
+
+  <p class="manifest-tools">
+    <a href="{% url 'admin:departure-manifest-csv' departure.pk %}">Download CSV</a>
+    — the CSV leaves out dietary and mobility notes, so it is safe to send on.
+  </p>
+
+  {% for group in groups %}
+    <div class="manifest-group">
+      <h2>
+        {{ group.label }}{% if group.boarding_time %} — boards {{ group.boarding_time|time:'g:i a' }}{% endif %}
+        <small>({{ group.headcount }})</small>
+      </h2>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Traveller</th>
+            <th scope="col">Booking</th>
+            <th scope="col">Ticket</th>
+            <th scope="col">Room</th>
+            <th scope="col">Dietary</th>
+            <th scope="col">Mobility</th>
+            <th scope="col">In an emergency</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for traveller in group.travellers %}
+            <tr>
+              <td>{{ traveller.full_name }}</td>
+              <td><a href="{% url 'admin:bookings_booking_change' traveller.booking.pk %}">{{ traveller.booking.reference }}</a></td>
+              <td>{{ traveller.price_option.label }}</td>
+              <td>{{ traveller.room_assignment|default:"—" }}</td>
+              <td class="manifest-note">{{ traveller.dietary_notes|default:"—" }}</td>
+              <td class="manifest-note">{{ traveller.mobility_notes|default:"—" }}</td>
+              <td class="manifest-note">
+                {% if traveller.emergency_contact_name %}
+                  {{ traveller.emergency_contact_name }}, {{ traveller.emergency_contact_phone }}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% empty %}
+    <p>Nobody is booked on this date yet.</p>
+  {% endfor %}
+
+  {% if needs_attention %}
+    <h2>Needs attention ({{ needs_attention|length }})</h2>
+    <ul>
+      {% for traveller in needs_attention %}
+        <li>
+          <strong>{{ traveller.full_name }}</strong>
+          {% if traveller.dietary_notes %} — {{ traveller.dietary_notes }}{% endif %}
+          {% if traveller.mobility_notes %} — {{ traveller.mobility_notes }}{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

@@ -10,13 +10,14 @@ from __future__ import annotations
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 
+from apps.catalog.models import Departure
 from apps.core.audit import record
 from apps.core.models import AuditEvent
 
-from . import reports
+from . import manifests, reports
 from .forms import (
     LeadGuestForm,
     OfflinePaymentForm,
@@ -34,6 +35,7 @@ from .services import (
 
 VIEW_PERMISSION = "bookings.view_scheduledpayment"
 BOOK_PERMISSION = "bookings.add_booking"
+MANIFEST_PERMISSION = "bookings.view_traveller"
 
 
 def payments_due(request: HttpRequest) -> TemplateResponse:
@@ -171,3 +173,44 @@ def _create_phone_booking(request, departure, guest_form, traveller_forms, payme
         f"Booking {booking.reference} created. It holds its seats until payment is recorded.",
     )
     return redirect("admin:bookings_booking_change", booking.pk)
+
+
+def _departure_or_404(pk: int) -> Departure:
+    return get_object_or_404(Departure.objects.select_related("trip"), pk=pk)
+
+
+def manifest(request: HttpRequest, departure_id: int) -> HttpResponse:
+    """The passenger list for one departure, laid out for printing.
+
+    Carries the dietary and mobility notes, which exist for exactly this: the
+    person running the trip needs them. They go no further — the CSV below
+    leaves them out, and the audit trail already redacts them.
+    """
+    if not request.user.has_perm(MANIFEST_PERMISSION):
+        raise PermissionDenied
+
+    departure = _departure_or_404(departure_id)
+    context = {
+        **admin.site.each_context(request),
+        "title": f"Manifest — {departure}",
+        **manifests.manifest(departure),
+    }
+    return TemplateResponse(request, "admin/manifest.html", context)
+
+
+def manifest_csv(request: HttpRequest, departure_id: int) -> HttpResponse:
+    """The manifest as a file, safe to hand to a coach company.
+
+    The health-adjacent notes are not in it. A file gets forwarded, and those
+    notes are not ours to spread around.
+    """
+    if not request.user.has_perm(MANIFEST_PERMISSION):
+        raise PermissionDenied
+
+    departure = _departure_or_404(departure_id)
+    record(request, AuditEvent.Action.EXPORT, departure, {"export": "manifest-csv"})
+
+    filename = f"manifest-{departure.start_date:%Y-%m-%d}-{departure.pk}.csv"
+    response = HttpResponse(manifests.manifest_csv(departure), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

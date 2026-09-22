@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django.db import transaction
+from django.urls import reverse
 from django.utils.html import format_html
 
 from apps.core.admin import AuditedAdmin
@@ -90,6 +91,7 @@ class DepartureAdmin(AuditedAdmin):
         "seats_summary",
         "lead_price",
         "final_payment_due_date",
+        "manifest_link",
     )
     list_filter = ("status", "trip__category", "start_date")
     search_fields = ("trip__title",)
@@ -115,6 +117,15 @@ class DepartureAdmin(AuditedAdmin):
         ),
         ("Policy and notes", {"fields": ("cancellation_policy", "notes_for_staff")}),
     )
+
+    @admin.display(description="Manifest")
+    def manifest_link(self, obj: Departure) -> str:
+        if not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="{}">Passenger list</a>',
+            reverse("admin:departure-manifest", args=[obj.pk]),
+        )
 
     @admin.display(description="Seats")
     def seats_summary(self, obj: Departure) -> str:

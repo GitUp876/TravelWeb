@@ -26,6 +26,8 @@ class AuditEvent(models.Model):
         DELETE = "delete", "Deleted"
         LOGIN = "login", "Signed in"
         LOGIN_FAILED = "login_failed", "Failed sign-in"
+        # Personal details leaving the building is worth a row of its own.
+        EXPORT = "export", "Exported"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
