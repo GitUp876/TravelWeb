@@ -47,9 +47,12 @@ def _metadata(obj: Any) -> dict[str, str]:
 
 
 def handle_checkout_completed(session: Any) -> Booking | None:
-    """Routes a completed checkout to the full-payment or deposit path."""
-    if _metadata(session).get("kind") == "plan_deposit":
+    """Routes a completed checkout by what it was opened to collect."""
+    kind = _metadata(session).get("kind")
+    if kind == "plan_deposit":
         return confirm_plan_deposit(session)
+    if kind == "balance":
+        return confirm_balance_payment(session)
     return confirm_paid_booking(session)
 
 
@@ -143,6 +146,54 @@ def confirm_plan_deposit(session: Any) -> Booking:
         card_last4=last4,
     )
     transaction.on_commit(lambda: send_booking_confirmation(booking))
+    return booking
+
+
+@transaction.atomic
+def confirm_balance_payment(session: Any) -> Booking:
+    """Records a guest clearing the balance on a booking they already hold.
+
+    The booking is confirmed already, so nothing about its status changes here;
+    only the money does. If the booking carries a payment plan, the instalments
+    still waiting are stood down, because what they were going to collect has
+    just arrived — an instalment left scheduled would charge the guest twice.
+    """
+    booking = _booking_for_session(session)
+
+    intent_id = str(getattr(session, "payment_intent", "") or "")
+    if intent_id and booking.payments.filter(stripe_payment_intent_id=intent_id).exists():
+        # A retried delivery of an event we have already handled.
+        return booking
+
+    amount = from_minor_units(getattr(session, "amount_total", None))
+
+    Payment.objects.create(
+        booking=booking,
+        amount=amount,
+        kind=Payment.Kind.BALANCE,
+        method=Payment.Method.CARD,
+        stripe_payment_intent_id=intent_id,
+    )
+    booking.amount_paid = booking.amount_paid + amount
+    booking.save(update_fields=["amount_paid"])
+
+    if booking.status != Booking.Status.CONFIRMED:
+        # The booking was cancelled while the guest was at Stripe. The money is
+        # real and is recorded as such; putting it right is a refund, which is a
+        # staff decision, so this only makes sure they can see it.
+        logger.warning(
+            "Balance payment arrived for %s booking %s", booking.status, booking.reference
+        )
+    if booking.balance < 0:
+        logger.warning(
+            "Booking %s is overpaid by %s after a balance payment",
+            booking.reference,
+            -booking.balance,
+        )
+    if booking.balance <= 0:
+        plans.settle_plan(booking)
+
+    logger.info("Recorded a balance payment on booking %s", booking.reference)
     return booking
 
 

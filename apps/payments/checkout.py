@@ -12,7 +12,18 @@ from apps.bookings.models import Booking
 from . import gateway
 from .money import to_minor_units
 
-__all__ = ["build_line_items", "start_checkout", "start_plan_checkout", "to_minor_units"]
+__all__ = [
+    "NothingOwed",
+    "build_line_items",
+    "start_balance_checkout",
+    "start_checkout",
+    "start_plan_checkout",
+    "to_minor_units",
+]
+
+
+class NothingOwed(RuntimeError):
+    """This booking has no balance to collect."""
 
 
 def build_line_items(booking: Booking) -> list[dict[str, Any]]:
@@ -82,5 +93,47 @@ def start_plan_checkout(booking: Booking, *, success_url: str, cancel_url: str) 
         idempotency_key=f"deposit-{booking.reference}",
         customer_email="" if booking.guest.stripe_customer_id else booking.guest.email,
         customer_id=booking.guest.stripe_customer_id,
+    )
+    return str(session.url)
+
+
+def start_balance_checkout(booking: Booking, *, success_url: str, cancel_url: str) -> str:
+    """Creates a checkout for whatever the booking still owes.
+
+    The amount is the balance this database holds, worked out from the total the
+    travellers' price options add up to. Nothing about it is read from the
+    request, so a guest who edits the form pays exactly what they owe.
+
+    The card is not saved: this is one payment, and a card we will not use again
+    is one we should not ask Stripe to keep.
+    """
+    balance = booking.balance
+    if balance <= 0:
+        raise NothingOwed(f"booking {booking.reference} owes nothing")
+
+    amount_minor = to_minor_units(balance)
+    metadata = {"booking_reference": booking.reference, "kind": "balance"}
+    session = gateway.create_checkout_session(
+        line_items=[
+            {
+                "quantity": 1,
+                "price_data": {
+                    "currency": settings.STRIPE_CURRENCY,
+                    "unit_amount": amount_minor,
+                    "product_data": {
+                        "name": f"{booking.departure.trip.title} — balance",
+                        "description": f"Balance owing on booking {booking.reference}",
+                    },
+                },
+            }
+        ],
+        customer_email=booking.guest.email,
+        client_reference_id=booking.reference,
+        metadata=metadata,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        # The amount is in the key, so returning to an unchanged balance reopens
+        # the same session, while a balance that has moved on opens a new one.
+        idempotency_key=f"balance-{booking.reference}-{amount_minor}",
     )
     return str(session.url)

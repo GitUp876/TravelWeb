@@ -16,7 +16,7 @@ from django.db import transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.catalog.models import Departure
 from apps.core.audit import client_ip
@@ -186,15 +186,16 @@ def _abandon(booking: Booking) -> None:
     plans.cancel_plan(booking)
 
 
-def booking_detail(request: HttpRequest, token: str) -> HttpResponse:
-    """A guest's view of their own booking, reached by signed link.
+def _booking_from_token(token: str) -> Booking:
+    """The booking a signed link names, or a 404.
 
-    A bad, edited or expired token is a 404: there is nothing to tell apart.
+    A bad, edited or expired token is a 404, the same answer as a reference that
+    does not exist: there is nothing to tell apart.
     """
     reference = read_token(token)
     if reference is None:
         raise Http404("This link is not valid")
-    booking = get_object_or_404(
+    return get_object_or_404(
         Booking.objects.select_related("departure__trip", "guest", "payment_plan").prefetch_related(
             "travellers__price_option",
             "travellers__pickup__pickup_point",
@@ -203,7 +204,75 @@ def booking_detail(request: HttpRequest, token: str) -> HttpResponse:
         ),
         reference=reference,
     )
-    return render(request, "bookings/detail.html", {"booking": booking})
+
+
+def _can_pay_balance(booking: Booking) -> bool:
+    """Whether this booking is one a guest may settle online right now.
+
+    Only a confirmed booking with money still owing. A pending one is mid-
+    checkout already, and a cancelled or expired one must not be paid for.
+    """
+    return (
+        settings.PAYMENTS_ENABLED
+        and booking.status == Booking.Status.CONFIRMED
+        and booking.balance > 0
+    )
+
+
+def booking_detail(request: HttpRequest, token: str) -> HttpResponse:
+    """A guest's view of their own booking, reached by signed link."""
+    booking = _booking_from_token(token)
+    return render(
+        request,
+        "bookings/detail.html",
+        {
+            "booking": booking,
+            "token": token,
+            "can_pay_balance": _can_pay_balance(booking),
+        },
+    )
+
+
+@require_POST
+def pay_balance(request: HttpRequest, token: str) -> HttpResponse:
+    """Sends a guest to Stripe to clear what is left on their booking.
+
+    POST only, so the link alone cannot open a checkout; the amount is the
+    balance this database holds and nothing in the request is read for it.
+    """
+    booking = _booking_from_token(token)
+    back = redirect("bookings:detail", token=token)
+
+    if not _can_pay_balance(booking):
+        messages.error(
+            request,
+            "There is nothing to pay on this booking. Call us if that looks wrong."
+            if settings.PAYMENTS_ENABLED
+            else "Online payment is unavailable right now. Please call us.",
+        )
+        return back
+
+    detail_url = settings.SITE_BASE_URL + reverse("bookings:detail", kwargs={"token": token})
+    try:
+        payment_url = checkout.start_balance_checkout(
+            booking,
+            success_url=detail_url,
+            cancel_url=f"{detail_url}?cancelled=1",
+        )
+    except checkout.NothingOwed:
+        # The balance was cleared between loading the page and posting it.
+        messages.info(request, "This booking is already paid in full.")
+        return back
+    except gateway.PaymentConfigurationError:
+        logger.error("Balance checkout attempted while Stripe is unconfigured")
+        messages.error(request, "Online payment is unavailable right now. Please call us.")
+        return back
+    except Exception:
+        logger.exception("Could not open a balance checkout for booking %s", booking.reference)
+        messages.error(request, "We could not reach the payment page. Please try again.")
+        return back
+
+    return redirect(payment_url)
 
 
 @require_http_methods(["GET", "POST"])

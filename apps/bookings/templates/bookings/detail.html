@@ -44,6 +44,17 @@
     </tbody>
   </table>
 
+  {% if can_pay_balance %}
+    <form class="pay-balance" method="post" action="{% url 'bookings:pay-balance' token=token %}">
+      {% csrf_token %}
+      <button type="submit">Pay the ${{ booking.balance|floatformat:2 }} balance now</button>
+    </form>
+    <p class="note">
+      You pay on Stripe's own page; we never see your card.
+      {% if booking.payment_plan %}Paying now cancels the instalments still to come.{% endif %}
+    </p>
+  {% endif %}
+
   {% if booking.payment_plan %}
     <h2>Payment plan</h2>
     <p class="meta">
