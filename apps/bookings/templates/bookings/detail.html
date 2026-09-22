@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Booking {{ booking.reference }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+  <h1>Booking {{ booking.reference }}</h1>
+
+  {% if booking.status == "pending" %}
+    <p class="lede">We are confirming your payment. This page updates once Stripe
+      tells us it has gone through, usually within a few seconds — refresh in a moment.</p>
+  {% elif booking.status == "confirmed" %}
+    <p class="lede">Your booking is confirmed. A confirmation email is on its way.</p>
+  {% elif booking.status == "cancelled" %}
+    <p class="lede">This booking has been cancelled. Call us if that is not what you expected.</p>
+  {% else %}
+    <p class="lede">This booking expired before payment was completed, so the seats were released.</p>
+  {% endif %}
+
+  <h2>{{ booking.departure.trip.title }}</h2>
+  <p class="meta">
+    Departs {{ booking.departure.start_date|date:'l j F Y' }}{% if booking.departure.duration_days > 1 %},
+    returns {{ booking.departure.end_date|date:'l j F Y' }}{% endif %}
+  </p>
+
+  <h2>Travelling</h2>
+  <ul class="travellers">
+    {% for traveller in booking.travellers.all %}
+      <li>
+        <strong>{{ traveller.full_name }}</strong> — {{ traveller.price_option.label }}
+        {% if traveller.pickup %}
+          <br>Boards at {{ traveller.pickup.pickup_point.name }},
+          {{ traveller.pickup.pickup_point.city }} at {{ traveller.pickup.boarding_time|time:'g:i a' }}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h2>Payment</h2>
+  <table class="prices">
+    <tbody>
+      <tr><th scope="row">Total</th><td>${{ booking.total_amount|floatformat:2 }}</td></tr>
+      <tr><th scope="row">Paid</th><td>${{ booking.amount_paid|floatformat:2 }}</td></tr>
+      <tr><th scope="row">Balance</th><td>${{ booking.balance|floatformat:2 }}</td></tr>
+    </tbody>
+  </table>
+
+  <p class="note">Keep this page's link to yourself — anyone who has it can see this booking.</p>
+{% endblock %}

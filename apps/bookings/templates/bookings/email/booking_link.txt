@@ -1,0 +1,8 @@
+Here is the link to your booking {{ booking.reference }}.
+
+{{ manage_url }}
+
+The link works for {{ valid_days }} days. If you did not ask for it, you can
+ignore this message; nothing has changed on your booking.
+
+{{ site_name }}

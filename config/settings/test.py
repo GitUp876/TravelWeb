@@ -14,5 +14,12 @@ STORAGES = {
 }
 AXES_ENABLED = False
 
+# Payments are "configured" in tests, but the gateway itself is always faked:
+# no test ever reaches Stripe.
+STRIPE_SECRET_KEY = "sk_test_not_a_real_key"
+STRIPE_WEBHOOK_SECRET = "whsec_not_a_real_secret"
+PAYMENTS_ENABLED = True
+SITE_BASE_URL = "http://testserver"
+
 # Whitenoise has no collected static directory during tests.
 MIDDLEWARE = [m for m in MIDDLEWARE if "whitenoise" not in m]  # noqa: F405

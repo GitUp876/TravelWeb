@@ -1,0 +1,20 @@
+{{ booking.guest.full_name }},
+
+Your booking is confirmed. Here are the details.
+
+Booking reference: {{ booking.reference }}
+Trip: {{ trip.title }}
+Departs: {{ departure.start_date|date:"l j F Y" }}{% if departure.duration_days > 1 %} and returns {{ departure.end_date|date:"l j F Y" }}{% endif %}
+
+Travelling:
+{% for traveller in travellers %}- {{ traveller.full_name }} ({{ traveller.price_option.label }}){% if traveller.pickup %}, boarding at {{ traveller.pickup.pickup_point.name }} at {{ traveller.pickup.boarding_time|time:"g:i a" }}{% endif %}
+{% endfor %}
+Total: ${{ booking.total_amount|floatformat:2 }}
+Paid: ${{ booking.amount_paid|floatformat:2 }}
+
+View or check your booking at any time:
+{{ manage_url }}
+
+Keep that link to yourself; anyone who has it can see this booking.
+
+{{ site_name }}

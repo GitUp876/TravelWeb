@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.catalog",
     "apps.bookings",
+    "apps.payments",
 ]
 
 MIDDLEWARE = [
@@ -170,6 +171,27 @@ ADMIN_URL = env("DJANGO_ADMIN_URL", "staff/")
 
 # How long a booking may hold seats before they are released back to the pool.
 SEAT_HOLD_MINUTES = int(env("SEAT_HOLD_MINUTES", "20"))
+
+# --- Payments (Stripe) -----------------------------------------------------
+# Card details never reach this application: the guest types them into Stripe's
+# own hosted checkout page. We hold identifiers only.
+
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_CURRENCY = env("STRIPE_CURRENCY", "usd")
+
+# Booking is offered only when both halves of the Stripe configuration are
+# present. Half-configured is treated as off, so a guest never reaches a
+# checkout that cannot be confirmed.
+PAYMENTS_ENABLED = bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET)
+
+# Absolute URLs for emails and Stripe redirects. Emails are sent from webhook
+# handling, where there is no request to build a URL from.
+SITE_BASE_URL = (env("SITE_BASE_URL") or "http://127.0.0.1:8000").rstrip("/")
+
+# How long a "manage my booking" link stays valid. Guests have no password, so
+# this link is the credential: short-lived, single-purpose and re-sendable.
+BOOKING_LINK_MAX_AGE_DAYS = int(env("BOOKING_LINK_MAX_AGE_DAYS", "30"))
 
 # --- Logging ---------------------------------------------------------------
 # Personal data must never reach the logs, so no request bodies are logged.

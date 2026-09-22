@@ -49,7 +49,17 @@
       <p>A payment plan is available on this date: ${{ departure.deposit_amount|floatformat:2 }}
         today, then equal instalments finishing {{ departure.final_payment_due_date|date:'j F Y' }}.</p>
     {% endif %}
-    <p class="note">Online booking opens in the next release. Call us to reserve a seat in the meantime.</p>
+    {% if request.GET.cancelled %}
+      <p class="note">Your payment was not completed, so nothing was charged and the
+        seats were released. You can start again below.</p>
+    {% endif %}
+    {% if departure.is_bookable and payments_enabled %}
+      <p><a class="button primary" href="{% url 'bookings:book' departure.pk %}">Book this departure</a></p>
+    {% elif departure.is_bookable %}
+      <p class="note">Online payment isn't switched on yet. Please call us to reserve a seat.</p>
+    {% else %}
+      <p class="note">This date is closed for online booking. Please call us.</p>
+    {% endif %}
 
     {% if departure.cancellation_policy %}
       <h2>Cancellation policy</h2>

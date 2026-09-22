@@ -6,9 +6,9 @@ requires multi-factor authentication.
 
 The full build plan, including the phases still to come, is in the project doc.
 
-## Where phase 1 stands
+## Where the build stands
 
-Built:
+Built in phase 1:
 
 - The data model: trips, dated departures, pickup points, per-person price
   options, guests, bookings, travellers, waitlist entries, payment plans and
@@ -21,16 +21,56 @@ Built:
   pickup points and availability.
 - Roles (Staff, Manager, Owner) as permission groups, MFA on every staff
   account, an audit trail of staff changes, and a hardened response header set.
-- Tests, linting, static analysis and a dependency audit, all wired into CI.
+
+Built in phase 2:
+
+- Booking and payment in full: a party-size selector, one form per traveller,
+  seat holds, Stripe-hosted checkout, and confirmation by webhook.
+- The guest's own booking page, reached by a signed expiring link rather than
+  a password, plus a "find my booking" form that emails the link back.
+- A confirmation email, and a `release_expired_holds` command that frees seats
+  when a guest never finishes paying.
 
 Not built yet, by design:
 
-- Taking a booking or a payment. That is phase 2, together with Stripe
-  Checkout, webhooks, confirmation emails and the guest's manage-my-booking
-  link. Departure pages say so in plain words rather than showing a dead
-  button.
-- Payment plans are modelled but not yet charged; instalment scheduling is
-  phase 3, with manifests, the payments-due report and phone bookings.
+- Payment plans are modelled but not charged. Instalment scheduling is
+  phase 3, together with manifests, the payments-due report, phone bookings
+  and offline payments.
+
+## How paying works
+
+1. The guest fills in the booking form. Nothing is charged and no card is
+   asked for on our pages.
+2. Seats are held for `SEAT_HOLD_MINUTES` (20 by default) while the guest is
+   at Stripe. The hold and the availability check happen in one transaction
+   with the departure row locked, so the last seat cannot be sold twice.
+3. The guest pays on Stripe's own hosted page. Card details go from their
+   browser to Stripe and never touch this application.
+4. Stripe calls the webhook. The signature is verified before anything in the
+   body is read; only then is the booking confirmed, the payment recorded and
+   the confirmation email sent.
+5. If the guest abandons checkout, the hold expires and the seats go back.
+
+The booking page is only offered when both `STRIPE_SECRET_KEY` and
+`STRIPE_WEBHOOK_SECRET` are set. Half-configured counts as off, so a guest can
+never reach a checkout we would be unable to confirm; production refuses to
+boot in that state.
+
+### Stripe setup
+
+```bash
+stripe listen --forward-to localhost:8000/stripe/webhook/   # prints whsec_...
+```
+
+Put that signing secret in `STRIPE_WEBHOOK_SECRET`. In production, add an
+endpoint in the Stripe dashboard for `https://<host>/stripe/webhook/`
+subscribed to `checkout.session.completed` and `checkout.session.expired`.
+
+### Scheduled jobs
+
+```bash
+python manage.py release_expired_holds    # every few minutes
+```
 
 ## Running it locally
 
@@ -83,7 +123,8 @@ config/settings/     base, dev, test and prod settings
 apps/core/           audit trail, security headers, the MFA admin site
 apps/accounts/       staff users, roles, the setup_mfa command
 apps/catalog/        trips, departures, prices, pickups, public pages
-apps/bookings/       guests, bookings, travellers, payment records
+apps/bookings/       guests, bookings, travellers, the public booking flow
+apps/payments/       the Stripe gateway, checkout, webhook and event log
 ```
 
 ## Security notes for anyone changing this
@@ -101,3 +142,10 @@ apps/bookings/       guests, bookings, travellers, payment records
   the manifest.
 - **`config/settings/prod.py` fails closed**: it refuses to boot without an
   explicit secret key, allowed hosts and a non-guessable admin path.
+- **The webhook signature is the security boundary.** `/stripe/webhook/` is a
+  public endpoint; nothing in the body is read until Stripe's signature over
+  that exact body verifies. Never add a code path that trusts the browser's
+  return from checkout instead.
+- **The booking link is a credential.** It is signed with the secret key and
+  expires. Do not add a page that looks a booking up by reference alone, and
+  keep the lookup form's answer identical whether or not a booking matched.

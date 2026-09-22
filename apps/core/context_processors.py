@@ -9,5 +9,6 @@ def site(request: HttpRequest) -> dict:
     return {
         "site_name": settings.SITE_NAME,
         "site_tagline": settings.SITE_TAGLINE,
+        "payments_enabled": settings.PAYMENTS_ENABLED,
         "categories": category_summaries(),
     }
