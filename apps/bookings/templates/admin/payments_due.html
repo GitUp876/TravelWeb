@@ -1,11 +1,17 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
-  <h1>Payments due</h1>
+<div class="staff-page">
   <p class="help">As at {{ as_of|date:'j F Y' }}. Upcoming covers the next
     {{ horizon_days }} day{{ horizon_days|pluralize }}, to {{ horizon_end|date:'j F Y' }}.</p>
 
-  <form method="get" style="margin-bottom:1em">
+  <div class="staff-tiles">
+    <div class="staff-tile{% if overdue %} is-alert{% endif %}"><small>Overdue</small><strong>${{ overdue_total|floatformat:2 }}</strong></div>
+    <div class="staff-tile"><small>Due in {{ horizon_days }} day{{ horizon_days|pluralize }}</small><strong>${{ upcoming_total|floatformat:2 }}</strong></div>
+    <div class="staff-tile{% if unplanned %} is-alert{% endif %}"><small>Balances with no plan</small><strong>${{ unplanned_total|floatformat:2 }}</strong></div>
+  </div>
+
+  <form method="get" class="staff-filter">
     <label for="days">Look ahead</label>
     <input type="number" name="days" id="days" min="1" max="365" value="{{ horizon_days }}">
     <button type="submit">Update</button>
@@ -102,4 +108,5 @@
   {% else %}
     <p>Every confirmed booking is either paid or on a live plan.</p>
   {% endif %}
+</div>
 {% endblock %}

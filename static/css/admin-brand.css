@@ -1,0 +1,122 @@
+/* Staff admin, in the public site's colours.
+
+   Only Django's own theme variables and a few component rules are touched, so
+   the admin keeps its layout, its light/dark toggle and its accessibility
+   behaviour. Loaded from the same origin, like everything else, so the
+   content security policy stays at 'self'. */
+
+@font-face {
+  font-family: "Figtree";
+  src: url("../fonts/figtree-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("../fonts/fraunces-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 800;
+  font-display: swap;
+}
+
+html[data-theme="light"],
+:root {
+  --primary: #127369;
+  --secondary: #0e4a55;
+  --accent: #f2b544;
+  --header-color: #cfe3e1;
+  --header-branding-color: #fff;
+  --header-bg: #0b3a43;
+  --breadcrumbs-bg: #0e4a55;
+  --breadcrumbs-fg: #cfe3e1;
+  --link-fg: #127369;
+  --link-hover-color: #0b3a43;
+  --link-selected-fg: #0e4a55;
+  --button-bg: #0e4a55;
+  --button-hover-bg: #0b3a43;
+  --default-button-bg: #b5462a;
+  --default-button-hover-bg: #9c3a21;
+  --selected-row: #fff4dc;
+  --darkened-bg: #fbf7f0;
+  --message-success-bg: #e6f5ee;
+  --message-warning-bg: #fff4dc;
+  --message-error-bg: #fdecea;
+  --font-family-primary: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #0e4a55;
+    --header-bg: #072a31;
+    --breadcrumbs-bg: #0b3a43;
+    --link-fg: #7fd1c7;
+    --link-hover-color: #b5ebe4;
+    --selected-row: #2a2413;
+    --darkened-bg: #1a1f20;
+  }
+}
+html[data-theme="dark"] {
+  --primary: #0e4a55;
+  --header-bg: #072a31;
+  --breadcrumbs-bg: #0b3a43;
+  --link-fg: #7fd1c7;
+  --link-hover-color: #b5ebe4;
+  --selected-row: #2a2413;
+  --darkened-bg: #1a1f20;
+}
+
+#header { padding-block: 12px; border-bottom: 3px solid var(--accent); }
+#site-name a { display: inline-flex; align-items: center; gap: 10px; font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.01em; }
+#site-name .admin-mark { width: 32px; height: 32px; }
+#header #nav-global { display: flex; gap: 6px; margin-left: 24px; margin-right: auto; }
+#header #nav-global a {
+  color: #fff; text-decoration: none; font-weight: 700; font-size: .85rem;
+  padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .1);
+}
+#header #nav-global a:hover { background: rgba(255, 255, 255, .2); }
+
+.module h2, .module caption, .inline-group h2 { background: var(--secondary); font-weight: 700; letter-spacing: .02em; }
+.button, input[type=submit], input[type=button], .submit-row input, a.button { border-radius: 8px; font-weight: 700; }
+fieldset.module { border-radius: 10px; overflow: hidden; }
+
+/* Photo previews in trip, gallery and site-photo forms */
+.admin-photo-preview {
+  display: block; width: 240px; max-width: 100%; aspect-ratio: 3 / 2; object-fit: cover;
+  border-radius: 10px; border: 1px solid var(--hairline-color); background: var(--darkened-bg);
+}
+#result_list .admin-photo-preview { width: 96px; border-radius: 6px; }
+
+/* Seat counts on the departure list */
+.seats { font-weight: 700; }
+.seats-open { color: #0f6b4f; }
+.seats-sold-out { color: #a3261b; }
+@media (prefers-color-scheme: dark) { .seats-open { color: #6fd3a8; } .seats-sold-out { color: #f08a80; } }
+html[data-theme="dark"] .seats-open { color: #6fd3a8; }
+html[data-theme="dark"] .seats-sold-out { color: #f08a80; }
+
+/* Staff pages: payments due, manifests, phone bookings */
+.staff-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+.staff-tile { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--hairline-color); background: var(--darkened-bg); }
+.staff-tile small { display: block; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--body-quiet-color); }
+.staff-tile strong { display: block; margin-top: 4px; font-size: 1.5rem; color: var(--body-loud-color); font-variant-numeric: tabular-nums; }
+.staff-tile.is-alert { border-color: #e7a79f; }
+.staff-tile.is-alert strong { color: var(--error-fg); }
+.staff-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 1em; }
+.staff-page table { width: 100%; }
+.staff-page td.money, .staff-page th.money { text-align: right; font-variant-numeric: tabular-nums; }
+.staff-page fieldset { border: 1px solid var(--hairline-color); border-radius: 10px; padding: 12px 16px 4px; margin: 0 0 16px; }
+.staff-page legend { font-weight: 700; padding: 0 6px; }
+
+.manifest-group { margin-bottom: 1.5em; }
+.manifest-note { font-size: .9em; }
+@media print {
+  #header, #nav-sidebar, .breadcrumbs, .manifest-tools, #footer, #toggle-nav-sidebar { display: none !important; }
+  .manifest-group { break-inside: avoid; }
+}
+.inline-group .admin-photo-preview { width: 180px; }
+.staff-page button {
+  background: var(--button-bg); color: var(--button-fg); border: 0; border-radius: 8px;
+  padding: 10px 15px; font: inherit; font-weight: 700; cursor: pointer;
+}
+.staff-page button:hover { background: var(--button-hover-bg); }
+.staff-page button.default { background: var(--default-button-bg); }
+.staff-page button.default:hover { background: var(--default-button-hover-bg); }

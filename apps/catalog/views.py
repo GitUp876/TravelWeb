@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, TemplateView
 
 from .models import Departure, PriceOption, Trip, TripCategory
+from .presentation import CATEGORY_DETAILS
 
 
 class HomeView(TemplateView):
@@ -22,8 +23,12 @@ class HomeView(TemplateView):
         return context
 
 
-def category_summaries() -> list[dict]:
-    """Each category with how many published trips have upcoming dates."""
+def category_summaries(photos: dict | None = None) -> list[dict]:
+    """Each category with how many published trips have upcoming dates.
+
+    With ``photos`` (from ``site_photos``), each entry also carries the picture
+    that stands for the category.
+    """
     counts = {
         row["category"]: row["trip_count"]
         for row in Trip.published.filter(departures__in=Departure.objects.bookable())
@@ -31,7 +36,13 @@ def category_summaries() -> list[dict]:
         .annotate(trip_count=Count("id", distinct=True))
     }
     return [
-        {"value": value, "label": label, "trip_count": counts.get(value, 0)}
+        {
+            "value": value,
+            "label": label,
+            "trip_count": counts.get(value, 0),
+            **CATEGORY_DETAILS[value],
+            **({"photo": photos[value]} if photos else {}),
+        }
         for value, label in TripCategory.choices
     ]
 
@@ -46,10 +57,16 @@ class CategoryView(TemplateView):
         context = super().get_context_data(**kwargs)
         bookable = Departure.objects.bookable()
         context["category_label"] = TripCategory(category).label
+        context["category_value"] = category
+        context["category_blurb"] = CATEGORY_DETAILS[category]["blurb"]
         context["trips"] = (
             Trip.published.filter(category=category, departures__in=bookable)
             .annotate(
                 next_departure=Min("departures__start_date", filter=Q(departures__in=bookable)),
+                lead_price=Min(
+                    "departures__price_options__amount",
+                    filter=Q(departures__in=bookable, departures__price_options__is_available=True),
+                ),
                 departure_count=Count(
                     "departures", filter=Q(departures__in=bookable), distinct=True
                 ),

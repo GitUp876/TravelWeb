@@ -1,23 +1,71 @@
 {% extends "base.html" %}
+{% load humanize ui %}
 
-{% block title %}{{ category_label }} — {{ site_name }}{% endblock %}
+{% block title %}{{ category_label }} · {{ site_name }}{% endblock %}
+{% block description %}{{ category_blurb }}{% endblock %}
 
 {% block content %}
-  <h1>{{ category_label }}</h1>
-  {% if trips %}
-    <div class="grid">
-      {% for trip in trips %}
-        <article class="card">
-          <h2><a href="{{ trip.get_absolute_url }}">{{ trip.title }}</a></h2>
-          <p>{{ trip.summary }}</p>
-          <p class="meta">
-            {{ trip.departure_count }} date{{ trip.departure_count|pluralize }} available
-            {% if trip.next_departure %}· next {{ trip.next_departure|date:'j M Y' }}{% endif %}
-          </p>
-        </article>
-      {% endfor %}
+  {% with photo=site_photos|get_item:category_value %}
+    <section class="page-banner">
+      <img src="{{ photo.url }}" alt="{{ photo.alt }}" width="1600" height="900">
+      <div class="wrap page-banner-content">
+        <ol class="breadcrumb">
+          <li><a href="{% url 'catalog:home' %}">Home</a></li>
+          <li aria-current="page">{{ category_label }}</li>
+        </ol>
+        <h1>{{ category_label }}</h1>
+        <p class="lede">{{ category_blurb }}</p>
+      </div>
+    </section>
+  {% endwith %}
+
+  <section class="section">
+    <div class="wrap">
+      {% if trips %}
+        <div class="section-head">
+          <div>
+            <h2>{{ trips|length }} trip{{ trips|length|pluralize }} on sale</h2>
+            <p>Soonest first. Open a trip to see every date and what's included.</p>
+          </div>
+        </div>
+        <div class="grid">
+          {% for trip in trips %}
+            {% trip_photo trip as photo %}
+            <article class="trip-card">
+              <div class="trip-card-media">
+                <img src="{{ photo.url }}" alt="{{ photo.alt }}" loading="lazy" width="800" height="533">
+                {% if trip.next_departure %}
+                  <p class="trip-card-badge" aria-hidden="true">
+                    <span class="month">{{ trip.next_departure|date:'M' }}</span>
+                    <span class="day">{{ trip.next_departure|date:'j' }}</span>
+                  </p>
+                {% endif %}
+              </div>
+              <div class="trip-card-body">
+                <h3><a href="{{ trip.get_absolute_url }}">{{ trip.title }}</a></h3>
+                <ul class="trip-card-facts">
+                  <li>{% icon "calendar" %} {{ trip.departure_count }} date{{ trip.departure_count|pluralize }}{% if trip.next_departure %}, next {{ trip.next_departure|date:'j M Y' }}{% endif %}</li>
+                  {% if trip.meals_included %}<li>{% icon "utensils" %} {{ trip.meals_included }} meal{{ trip.meals_included|pluralize }}</li>{% endif %}
+                </ul>
+                <p class="trip-card-summary">{{ trip.summary }}</p>
+                <div class="trip-card-foot">
+                  <p class="price-from">
+                    {% if trip.lead_price %}<small>From</small><strong>${{ trip.lead_price|floatformat:2|intcomma }}</strong> <span>per person</span>{% endif %}
+                  </p>
+                  <span class="link-arrow" aria-hidden="true">View dates {% icon "arrow-right" %}</span>
+                </div>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="center-card">
+          <div class="badge-icon">{% icon "compass" "icon-xl" %}</div>
+          <h2>Nothing on sale in this category right now.</h2>
+          <p class="muted">New dates are added all the time. In the meantime, take a look at what else is coming up.</p>
+          <p><a class="btn btn-primary" href="{% url 'catalog:home' %}#departures">See all upcoming trips</a></p>
+        </div>
+      {% endif %}
     </div>
-  {% else %}
-    <p class="empty">Nothing on sale in this category right now.</p>
-  {% endif %}
+  </section>
 {% endblock %}

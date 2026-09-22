@@ -46,6 +46,10 @@ class LeadGuestForm(forms.ModelForm):
             "full_name": "Your name",
             "email": "Email address",
             "phone": "Phone number",
+            "address_line1": "Address",
+            "address_line2": "Address line 2 (optional)",
+            "region": "State (optional)",
+            "postal_code": "ZIP code",
             "marketing_consent": "Email me about future trips",
         }
         help_texts = {
@@ -54,6 +58,7 @@ class LeadGuestForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        kwargs.setdefault("label_suffix", "")
         super().__init__(*args, **kwargs)
         self.fields["phone"].required = True
         for name in ("address_line2", "region"):
@@ -86,6 +91,7 @@ class TravellerForm(forms.ModelForm):
         }
 
     def __init__(self, *args, departure: Departure, **kwargs):
+        kwargs.setdefault("label_suffix", "")
         super().__init__(*args, **kwargs)
         # Narrowing the querysets to this departure is what stops a guest
         # posting the id of a cheaper price from another date.
@@ -93,6 +99,15 @@ class TravellerForm(forms.ModelForm):
         self.fields["price_option"].empty_label = None
         self.fields["pickup"].queryset = departure.pickups.select_related("pickup_point")
         self.fields["pickup"].required = departure.pickups.exists()
+        self.fields["pickup"].empty_label = "Choose where to board"
+        # Guests pick by name and price; the ids behind them are what is checked.
+        self.fields["price_option"].label_from_instance = lambda option: (
+            f"{option.label} (${option.amount:,.2f})"
+        )
+        self.fields["pickup"].label_from_instance = lambda pickup: (
+            f"{pickup.pickup_point.name}, {pickup.pickup_point.city}, "
+            f"boards {pickup.boarding_time:%I:%M %p}".replace(" 0", " ")
+        )
         self.fields["emergency_contact_name"].required = True
         self.fields["emergency_contact_phone"].required = True
 
@@ -194,6 +209,10 @@ class BookingLookupForm(forms.Form):
 
     reference = forms.CharField(label="Booking reference", max_length=12)
     email = forms.EmailField(label="Email address on the booking")
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("label_suffix", "")
+        super().__init__(*args, **kwargs)
 
     def clean_reference(self) -> str:
         return self.cleaned_data["reference"].strip().upper()

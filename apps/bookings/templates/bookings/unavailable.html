@@ -1,15 +1,24 @@
 {% extends "base.html" %}
+{% load ui %}
 
-{% block title %}Booking unavailable — {{ site_name }}{% endblock %}
+{% block title %}Booking unavailable · {{ site_name }}{% endblock %}
 
 {% block content %}
-  <h1>This date can't be booked online</h1>
-  {% if not payments_enabled %}
-    <p class="lede">Online payment isn't switched on yet. Please call us to reserve a seat.</p>
-  {% elif departure.is_sold_out %}
-    <p class="lede">This departure is sold out. Call us and we'll add you to the waitlist.</p>
-  {% else %}
-    <p class="lede">Booking has closed for this date. Please call us — we may still be able to help.</p>
-  {% endif %}
-  <p><a href="{{ departure.get_absolute_url }}">Back to {{ departure.trip.title }}</a></p>
+  <div class="wrap">
+    <div class="center-card">
+      <div class="badge-icon">{% icon "calendar" "icon-xl" %}</div>
+      <h1>This date can't be booked online</h1>
+      {% if not payments_enabled %}
+        <p class="lede">Online payment isn't switched on yet. Please call us to reserve a seat.</p>
+      {% elif departure.is_sold_out %}
+        <p class="lede">This departure is sold out. Call us and we'll add you to the waitlist.</p>
+      {% else %}
+        <p class="lede">Booking has closed for this date. Please call us — we may still be able to help.</p>
+      {% endif %}
+      <p class="hero-actions">
+        {% if site_phone %}<a class="btn btn-primary" href="tel:{{ site_phone_href }}">{% icon "phone" %} Call {{ site_phone }}</a>{% endif %}
+        <a class="btn" href="{{ departure.trip.get_absolute_url }}">Back to {{ departure.trip.title }}</a>
+      </p>
+    </div>
+  </div>
 {% endblock %}

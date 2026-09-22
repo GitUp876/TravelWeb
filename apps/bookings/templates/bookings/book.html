@@ -1,57 +1,110 @@
 {% extends "base.html" %}
+{% load humanize ui %}
 
-{% block title %}Book {{ trip.title }} — {{ site_name }}{% endblock %}
+{% block title %}Book {{ trip.title }} · {{ site_name }}{% endblock %}
 
 {% block content %}
-  <p class="breadcrumb"><a href="{{ departure.get_absolute_url }}">Back to this date</a></p>
-  <h1>Book {{ trip.title }}</h1>
-  <p class="lede">
-    {{ departure.start_date|date:'l j F Y' }}{% if departure.duration_days > 1 %} – {{ departure.end_date|date:'l j F Y' }}{% endif %}
-    · {{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} left
-  </p>
+  <div class="wrap">
+    <header class="page-head">
+      <ol class="breadcrumb">
+        <li><a href="{{ trip.get_absolute_url }}">{{ trip.title }}</a></li>
+        <li><a href="{{ departure.get_absolute_url }}">{{ departure.start_date|date:'j M Y' }}</a></li>
+        <li aria-current="page">Book</li>
+      </ol>
+      <h1>Book {{ trip.title }}</h1>
+      <p class="lede">
+        {{ departure.start_date|date:'l j F Y' }}{% if departure.duration_days > 1 %} – {{ departure.end_date|date:'l j F Y' }}{% endif %}
+        · {{ departure.seats_available }} seat{{ departure.seats_available|pluralize }} left
+      </p>
+    </header>
 
-  <form method="get" class="party-form">
-    <label for="party">How many are travelling?</label>
-    <select name="party" id="party">
-      {% for size in party_choices %}
-        <option value="{{ size }}" {% if size == party %}selected{% endif %}>{{ size }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit">Update</button>
-  </form>
+    <ol class="stepper" aria-label="Booking progress">
+      <li aria-current="step">Your details</li>
+      <li>Secure payment</li>
+      <li>Confirmed</li>
+    </ol>
 
-  <form method="post" action="?party={{ party }}" class="booking-form">
-    {% csrf_token %}
+    <div class="layout">
+      <div class="layout-main">
+        <div class="form-section party-card">
+          <form method="get" class="party-form">
+            <label for="party">How many are travelling?</label>
+            <select name="party" id="party">
+              {% for size in party_choices %}
+                <option value="{{ size }}" {% if size == party %}selected{% endif %}>{{ size }} {% if size == 1 %}person{% else %}people{% endif %}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn-sm">Update</button>
+          </form>
+          <p class="note">Choose this first: changing it reloads the form.</p>
+        </div>
 
-    <fieldset>
-      <legend>Your details</legend>
-      {{ guest_form.as_p }}
-    </fieldset>
+        <form method="post" action="?party={{ party }}" class="booking-form">
+          {% csrf_token %}
 
-    {% for form in traveller_forms %}
-      <fieldset>
-        <legend>Traveller {{ forloop.counter }}</legend>
-        {{ form.as_p }}
-      </fieldset>
-    {% endfor %}
+          <fieldset class="form-section">
+            <legend><span class="num">1</span> Your details</legend>
+            <p class="section-note">We'll send your confirmation and your booking link here.</p>
+            {% if guest_form.non_field_errors %}{{ guest_form.non_field_errors }}{% endif %}
+            <div class="form-grid">{{ guest_form.as_p }}</div>
+          </fieldset>
 
-    {% if plan_available %}
-      <fieldset>
-        <legend>How would you like to pay?</legend>
-        {{ payment_form.payment_option }}
-        <p class="note">
-          On a payment plan we take a ${{ deposit_amount|floatformat:2 }} deposit today and
-          charge the balance in scheduled instalments, the last on
-          {{ final_payment_due_date|date:'j F Y' }}. Your card is saved securely by
-          Stripe for those instalments.
-        </p>
-      </fieldset>
-    {% endif %}
+          {% for form in traveller_forms %}
+            <fieldset class="form-section">
+              <legend><span class="num">{{ forloop.counter|add:1 }}</span> Traveller {{ forloop.counter }}{% if forloop.first %} <span class="muted small">(this can be you)</span>{% endif %}</legend>
+              <div class="form-grid">{{ form.as_p }}</div>
+            </fieldset>
+          {% endfor %}
 
-    <p class="note">
-      The next page is Stripe's secure checkout. Your card details go straight to
-      Stripe and are never seen by this website.
-    </p>
-    <button type="submit" class="primary">Continue to payment</button>
-  </form>
+          {% if plan_available %}
+            <fieldset class="form-section">
+              <legend><span class="num">{% icon "wallet" %}</span> How would you like to pay?</legend>
+              <div class="pay-options">{{ payment_form.payment_option }}</div>
+              <p class="note">
+                On a payment plan we take a ${{ deposit_amount|floatformat:2|intcomma }} deposit today and
+                charge the balance in scheduled instalments, the last on
+                {{ final_payment_due_date|date:'j F Y' }}. Your card is saved securely by
+                Stripe for those instalments.
+              </p>
+            </fieldset>
+          {% endif %}
+
+          <div class="secure-note">
+            {% icon "shield" %}
+            <span>The next page is Stripe's secure checkout. Your card details go straight to
+              Stripe and are never seen by this website.</span>
+          </div>
+          <div class="submit-row">
+            <button type="submit" class="primary btn-lg">Continue to payment {% icon "arrow-right" %}</button>
+            <a href="{{ departure.get_absolute_url }}">Back to this date</a>
+          </div>
+        </form>
+      </div>
+
+      <aside class="aside-sticky" aria-label="Your trip">
+        {% trip_photo trip as photo %}
+        <div class="card summary-card">
+          <img src="{{ photo.url }}" alt="{{ photo.alt }}" width="800" height="450">
+          <div class="summary-body">
+            <h2>{{ trip.title }}</h2>
+            <p class="meta">{% icon "calendar" %} {{ departure.start_date|date:'D j M Y' }}{% if departure.duration_days > 1 %} – {{ departure.end_date|date:'D j M Y' }}{% endif %}</p>
+
+
+            <ul>
+              {% for option in departure.price_options.all %}
+                {% if option.is_available %}<li><span>{{ option.label }}</span><span>${{ option.amount|floatformat:2|intcomma }}</span></li>{% endif %}
+              {% endfor %}
+            </ul>
+            <p class="note">Prices are per person. You'll see the total on the payment page before you pay.</p>
+          </div>
+        </div>
+        {% if site_phone %}
+          <div class="help-card">
+            <strong>{% icon "phone" %} Need a hand?</strong>
+            <p>Call <a href="tel:{{ site_phone_href }}">{{ site_phone }}</a> and we can book for you.</p>
+          </div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
 {% endblock %}

@@ -1,14 +1,23 @@
+import re
+
 from django.conf import settings
 from django.http import HttpRequest
 
 
 def site(request: HttpRequest) -> dict:
     """Site-wide values every template needs, including the category nav."""
+    from apps.catalog.presentation import site_photos
     from apps.catalog.views import category_summaries
 
+    photos = site_photos()
     return {
         "site_name": settings.SITE_NAME,
         "site_tagline": settings.SITE_TAGLINE,
+        "site_phone": settings.SITE_PHONE,
+        # Digits and a leading + only, so the tel: link cannot carry anything else.
+        "site_phone_href": re.sub(r"[^\d+]", "", settings.SITE_PHONE),
+        "site_email": settings.SITE_EMAIL,
         "payments_enabled": settings.PAYMENTS_ENABLED,
-        "categories": category_summaries(),
+        "site_photos": photos,
+        "categories": category_summaries(photos),
     }

@@ -1,5 +1,8 @@
 """Settings for the test suite: fast, hermetic, no external services."""
 
+import tempfile
+from pathlib import Path
+
 from .base import *  # noqa: F403
 
 DEBUG = False
@@ -23,3 +26,8 @@ SITE_BASE_URL = "http://testserver"
 
 # Whitenoise has no collected static directory during tests.
 MIDDLEWARE = [m for m in MIDDLEWARE if "whitenoise" not in m]  # noqa: F405
+
+# Uploaded photos go to a throwaway directory, never the working tree.
+MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="tours-test-media-"))
+SITE_PHONE = ""
+SITE_EMAIL = ""

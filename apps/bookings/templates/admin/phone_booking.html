@@ -1,7 +1,7 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
-  <h1>Take a phone booking</h1>
+<div class="staff-page">
 
   <form method="get">
     {{ picker.as_p }}
@@ -44,4 +44,5 @@
       <button type="submit" class="default">Create booking</button>
     </form>
   {% endif %}
+</div>
 {% endblock %}
