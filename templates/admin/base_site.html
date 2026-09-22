@@ -14,7 +14,12 @@
 {% endblock %}
 
 {% block nav-global %}
-  {% if user.is_authenticated and perms.bookings.view_scheduledpayment %}
-    <a href="{% url 'admin:payments-due' %}">Payments due</a>
+  {% if user.is_authenticated %}
+    {% if perms.bookings.add_booking %}
+      <a href="{% url 'admin:phone-booking' %}">Phone booking</a>
+    {% endif %}
+    {% if perms.bookings.view_scheduledpayment %}
+      <a href="{% url 'admin:payments-due' %}">Payments due</a>
+    {% endif %}
   {% endif %}
 {% endblock %}

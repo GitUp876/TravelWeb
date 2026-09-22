@@ -270,6 +270,15 @@ class Departure(TimeStampedModel):
         return max(self.seats_for_sale - self.seats_taken, 0)
 
     @property
+    def seats_available_to_staff(self) -> int:
+        """Every seat still free, including the ones held back from the website.
+
+        Holding seats back is what reserves them for phone bookings and escorts,
+        so a staff-taken booking counts against the coach's real capacity.
+        """
+        return max(self.capacity - self.seats_taken, 0)
+
+    @property
     def is_sold_out(self) -> bool:
         return self.seats_available <= 0
 
@@ -292,6 +301,21 @@ class Departure(TimeStampedModel):
         if self.booking_closes_at and self.booking_closes_at < now:
             return False
         return not self.is_sold_out
+
+    @property
+    def is_bookable_by_staff(self) -> bool:
+        """Whether staff may take a booking for this date over the phone.
+
+        Wider than ``is_bookable``: a date closed to the website, or one whose
+        booking window has passed, is still bookable by a person on the phone.
+        A cancelled departure and a date already gone are refused, because those
+        are mistakes rather than phone bookings.
+        """
+        if self.status == self.Status.CANCELLED:
+            return False
+        if self.start_date < timezone.localdate():
+            return False
+        return self.seats_available_to_staff > 0
 
     @property
     def payment_plan_available(self) -> bool:

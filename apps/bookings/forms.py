@@ -6,11 +6,16 @@ choice a guest makes is re-checked against the departure they are booking.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django import forms
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.catalog.models import Departure
 
-from .models import Guest, Traveller
+from .models import Guest, Payment, Traveller
+from .services import OFFLINE_METHODS
 
 MAX_PARTY_SIZE = 10
 
@@ -120,6 +125,64 @@ class PaymentOptionForm(forms.Form):
                 (self.FULL, "Pay in full now"),
                 (self.PLAN, "Pay a deposit now, the balance in scheduled instalments"),
             ]
+
+
+class StaffDepartureChoiceForm(forms.Form):
+    """Which date, and for how many, before the traveller forms can be built.
+
+    Offers dates the website has closed or never showed, because that is exactly
+    what someone rings up about; a cancelled date and one already gone are left
+    out, since booking either is a mistake rather than a phone booking.
+    """
+
+    departure = forms.ModelChoiceField(queryset=Departure.objects.none(), label="Date")
+    party = forms.IntegerField(
+        min_value=1, max_value=MAX_PARTY_SIZE, initial=1, label="How many travelling"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["departure"].queryset = (
+            Departure.objects.select_related("trip")
+            .exclude(status=Departure.Status.CANCELLED)
+            .filter(start_date__gte=timezone.localdate())
+            .order_by("start_date")
+        )
+
+
+class OfflinePaymentForm(forms.Form):
+    """Money taken by hand: cash, a cheque, a bank transfer.
+
+    There is deliberately no card field. A guest paying by card pays on Stripe's
+    own page; taking a card number over the phone and typing it in here would
+    move the whole site out of PCI SAQ A.
+    """
+
+    amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        required=False,
+        label="Amount taken",
+    )
+    method = forms.ChoiceField(
+        choices=[("", "No payment taken yet")]
+        + [(value, label) for value, label in Payment.Method.choices if value in OFFLINE_METHODS],
+        required=False,
+        label="How it was paid",
+    )
+    reference = forms.CharField(
+        max_length=100, required=False, label="Cheque number or receipt reference"
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        amount, method = cleaned.get("amount"), cleaned.get("method")
+        if amount and not method:
+            raise ValidationError({"method": "Say how the money was taken."})
+        if method and not amount:
+            raise ValidationError({"amount": "Enter the amount taken."})
+        return cleaned
 
 
 class BookingLookupForm(forms.Form):

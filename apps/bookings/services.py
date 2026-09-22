@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from apps.catalog.models import Departure
 
-from .models import Booking, Guest, Traveller
+from .models import Booking, Guest, Payment, Traveller
 
 
 class SeatsUnavailable(RuntimeError):
@@ -34,11 +34,17 @@ def create_pending_booking(
     travellers_data: list[dict],
     source: str = Booking.Source.WEB,
     created_by=None,
+    for_staff: bool = False,
 ) -> Booking:
     """Holds seats for a party and returns the pending booking.
 
     The total is computed here from each traveller's chosen price option. No
     amount from the request is used, or even read.
+
+    ``for_staff`` is what a phone booking sets: it reaches the seats held back
+    from the website and the dates closed to it, which is the whole point of
+    holding seats back. It never reaches a cancelled departure or a date that
+    has already gone.
     """
     if not travellers_data:
         raise SeatsUnavailable("a booking needs at least one traveller")
@@ -46,22 +52,26 @@ def create_pending_booking(
     locked = Departure.objects.select_for_update().get(pk=departure.pk)
     # Seats are checked first so a sold-out date says "sold out" rather than
     # the vaguer "closed for booking" that every other failure gets.
-    if locked.seats_available < len(travellers_data):
-        raise SeatsUnavailable(
-            f"{locked.seats_available} seat(s) left, {len(travellers_data)} asked for"
-        )
-    if not locked.is_bookable:
+    seats_left = locked.seats_available_to_staff if for_staff else locked.seats_available
+    if seats_left < len(travellers_data):
+        raise SeatsUnavailable(f"{seats_left} seat(s) left, {len(travellers_data)} asked for")
+    if not (locked.is_bookable_by_staff if for_staff else locked.is_bookable):
         raise DepartureNotBookable(str(locked))
 
     guest = _guest_for(guest_data)
 
+    hold = (
+        timedelta(days=settings.STAFF_HOLD_DAYS)
+        if for_staff
+        else timedelta(minutes=settings.SEAT_HOLD_MINUTES)
+    )
     booking = Booking.objects.create(
         departure=locked,
         guest=guest,
         status=Booking.Status.PENDING,
         source=source,
         created_by=created_by,
-        hold_expires_at=timezone.now() + timedelta(minutes=settings.SEAT_HOLD_MINUTES),
+        hold_expires_at=timezone.now() + hold,
     )
 
     total = Decimal("0.00")
@@ -118,6 +128,70 @@ def _guest_for(guest_data: dict) -> Guest:
     if updates:
         guest.save(update_fields=updates)
     return guest
+
+
+OFFLINE_METHODS = (Payment.Method.CASH, Payment.Method.CHEQUE, Payment.Method.TRANSFER)
+
+
+class InvalidPayment(ValueError):
+    """The payment staff described cannot be recorded as given."""
+
+
+@transaction.atomic
+def record_offline_payment(
+    *,
+    booking: Booking,
+    amount: Decimal,
+    method: str,
+    taken_by,
+    reference: str = "",
+) -> Payment:
+    """Records money taken away from Stripe: cash, a cheque, a bank transfer.
+
+    Never a card number. This application has no field for one and must not grow
+    one; a guest paying by card pays on Stripe's own page, which is what keeps
+    the site in PCI SAQ A.
+
+    Taking money settles the booking: a pending one is confirmed here, because a
+    guest who has handed over a cheque should not lose their seat to a hold
+    expiring.
+    """
+    if amount is None or amount <= 0:
+        raise InvalidPayment("an offline payment must be a positive amount")
+    if method not in OFFLINE_METHODS:
+        raise InvalidPayment(f"{method} is not a payment staff can record by hand")
+
+    locked = Booking.objects.select_for_update().get(pk=booking.pk)
+    if locked.status in (Booking.Status.CANCELLED, Booking.Status.EXPIRED):
+        raise InvalidPayment("that booking is no longer live")
+
+    payment = Payment.objects.create(
+        booking=locked,
+        amount=amount,
+        kind=_offline_kind(locked, amount),
+        method=method,
+        offline_reference=reference,
+        taken_by=taken_by,
+    )
+
+    locked.amount_paid = locked.amount_paid + amount
+    fields = ["amount_paid"]
+    if locked.status == Booking.Status.PENDING:
+        locked.status = Booking.Status.CONFIRMED
+        locked.confirmed_at = locked.confirmed_at or timezone.now()
+        locked.hold_expires_at = None
+        fields += ["status", "confirmed_at", "hold_expires_at"]
+    locked.save(update_fields=fields)
+    return payment
+
+
+def _offline_kind(booking: Booking, amount: Decimal) -> str:
+    """What to call the payment, from where it sits against the total."""
+    if booking.amount_paid > 0:
+        return Payment.Kind.BALANCE
+    if amount >= booking.total_amount:
+        return Payment.Kind.FULL
+    return Payment.Kind.DEPOSIT
 
 
 def release_expired_holds() -> int:
