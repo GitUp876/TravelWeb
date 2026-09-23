@@ -141,6 +141,7 @@ confirm and reconcile the off-session instalment charges.
 ```bash
 python manage.py release_expired_holds    # every few minutes
 python manage.py charge_due_instalments    # once or twice a day
+python manage.py send_staff_digest         # once a day, after the morning charge run
 ```
 
 `charge_due_instalments` charges any payment-plan instalment that has come due,
@@ -148,6 +149,40 @@ off-session, against the card the guest saved at their deposit checkout. It is
 idempotent per instalment, so running it twice never takes a payment twice; a
 declined instalment marks itself and its plan as needing attention rather than
 retrying blindly. `--dry-run` lists what is due without charging.
+
+## Deploying
+
+`render.yaml` is a Render Blueprint for the whole production setup: the web
+service with its photo disk, a Postgres database with point-in-time recovery,
+the three scheduled jobs, and one environment group they all share. In the
+Render dashboard choose **New > Blueprint** and pick this repository.
+
+- Render cannot prompt for values inside an environment group, so after the
+  first apply add the values listed in `render.yaml` to the `travelweb-shared`
+  group, then redeploy. Production refuses to boot until
+  `DJANGO_ALLOWED_HOSTS`, `DJANGO_ADMIN_URL` and a secret key are set.
+- Migrations run as the web service's pre-deploy command, so a deploy never
+  serves new code against an old schema. The image itself never migrates.
+- Cron schedules are UTC.
+- Upload one photo straight after the first deploy. The image runs as the
+  unprivileged `app` user; if the upload fails with a permission error, the
+  disk is not writable by that user.
+
+### Alerts
+
+- **Errors.** Set `DJANGO_ADMINS` to a comma-separated list of addresses. Any
+  logged error is emailed to them, at most once per fifteen minutes per kind
+  of error. The email names the URL pattern that failed and the traceback's
+  file and line positions, and nothing else: no request body, no cookies, no
+  query string and no local variables, because those carry guests' details and
+  their signed booking links. Django's own request-dumping error email is
+  switched off in `config/settings/base.py`.
+- **Daily digest.** `python manage.py send_staff_digest` emails every active
+  Manager and Owner a list of what needs a person: payment plans with a
+  declined card, overdue instalments, money held on cancelled or expired
+  bookings, overpaid bookings, and Stripe notifications that failed in the
+  last day. It lists booking references and amounts only. It sends nothing on
+  a quiet day; `--always` sends anyway, which is a quick way to test email.
 
 ## Running it locally
 
