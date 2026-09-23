@@ -2,12 +2,15 @@
 
 Category blurbs and icons live in code because the categories themselves do.
 Photos for fixed places on the site come from ``SiteImage`` when staff have
-uploaded one, and fall back to the built-in illustrations otherwise.
+uploaded one, and fall back to the built-in illustrations otherwise. The logo
+and the home page and footer wording come from ``SiteText`` the same way.
 """
 
 from __future__ import annotations
 
-from .models import SiteImage, TripCategory
+from django.templatetags.static import static
+
+from .models import SiteImage, SitePage, SiteText, TripCategory
 
 CATEGORY_DETAILS = {
     TripCategory.DAY_TRIP: {
@@ -57,3 +60,32 @@ def site_photos() -> dict[str, dict[str, str]]:
             placeholder = SiteImage.placeholder_url(slot)
             photos[slot] = {"url": placeholder, "card_url": placeholder, "alt": ""}
     return photos
+
+
+DEFAULT_TEXT = {
+    "home_headline": "Leave the driving to us.",
+    "home_headline_accent": "Enjoy the journey.",
+    "home_intro": "Board close to home, travel with good company, and let a friendly "
+    "tour director take care of the rest.",
+    "footer_about": "Day trips, theatre coaches and escorted tours with a friendly tour "
+    "director, pickups close to home and nothing to organise but your suitcase.",
+}
+
+
+def site_text() -> dict[str, str]:
+    """The logo and the site's own wording, with built-in text for any blanks."""
+    saved = SiteText.current()
+    text = {
+        key: (getattr(saved, key, "") or "").strip() or default
+        for key, default in DEFAULT_TEXT.items()
+    }
+    text["logo_url"] = saved.logo.url if saved and saved.logo else static("img/logo-mark.svg")
+    return text
+
+
+def published_pages() -> dict[str, str]:
+    """The legal and contact pages guests can reach, by kind, for the footer."""
+    return {
+        page.kind: page.title
+        for page in SitePage.objects.filter(is_published=True).only("kind", "title")
+    }

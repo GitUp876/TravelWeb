@@ -142,6 +142,19 @@ class PaymentOptionForm(forms.Form):
             ]
 
 
+class TermsConsentForm(forms.Form):
+    """The guest's agreement to the booking terms, asked for once they exist.
+
+    Only used while the business has published its terms page; the booking
+    records when the box was ticked.
+    """
+
+    accept_terms = forms.BooleanField(
+        required=True,
+        error_messages={"required": "Please confirm you have read and accept the booking terms."},
+    )
+
+
 class StaffDepartureChoiceForm(forms.Form):
     """Which date, and for how many, before the traveller forms can be built.
 

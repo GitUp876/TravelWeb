@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load ui %}
+
+{% block title %}{{ title }} · {{ site_name }}{% endblock %}
+{% block description %}{{ title }} for {{ site_name }}.{% endblock %}
+
+{% block content %}
+  <div class="wrap">
+    <header class="page-head narrow">
+      <h1>{{ title }}</h1>
+      {% if page and not is_contact %}<p class="muted small">Last updated {{ page.updated_at|date:"j F Y" }}</p>{% endif %}
+    </header>
+
+    <div class="narrow site-page">
+      {% if is_contact and site_phone or is_contact and site_email %}
+        <div class="card contact-card">
+          <ul>
+            {% if site_phone %}<li>{% icon "phone" %} <a href="tel:{{ site_phone_href }}">{{ site_phone }}</a></li>{% endif %}
+            {% if site_email %}<li>{% icon "mail" %} <a href="mailto:{{ site_email }}">{{ site_email }}</a></li>{% endif %}
+          </ul>
+        </div>
+      {% endif %}
+      {% if page %}
+        <div class="prose">{{ page.body|page_text }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

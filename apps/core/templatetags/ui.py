@@ -7,7 +7,7 @@ cannot take a page down.
 """
 
 from django import template
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join, urlize
 from django.utils.safestring import mark_safe
 
 register = template.Library()
@@ -133,3 +133,42 @@ def get_item(mapping, key):
         return mapping.get(key)
     except AttributeError:
         return None
+
+
+@register.filter
+def page_text(text: str) -> str:
+    """Staff-written plain text as paragraphs, headings and bullet lists.
+
+    Everything is escaped before any markup is added, so text typed into the
+    admin can never become HTML or script. Blank lines separate blocks; a
+    block starting '## ' is a heading and one whose lines all start '- ' is a
+    list. Web addresses become links that leave the site without a referrer.
+    """
+    blocks = [b.strip() for b in str(text or "").replace("\r\n", "\n").split("\n\n")]
+    html = []
+    for block in blocks:
+        if not block:
+            continue
+        lines = [line.strip() for line in block.split("\n") if line.strip()]
+        if lines[0].startswith("## "):
+            html.append(format_html("<h2>{}</h2>", lines.pop(0)[3:].strip()))
+            if not lines:
+                continue
+        if all(line.startswith("- ") for line in lines):
+            items = format_html_join("", "<li>{}</li>", ((_linked(line[2:]),) for line in lines))
+            html.append(format_html("<ul>{}</ul>", items))
+        else:
+            joined = mark_safe("<br>".join(_linked(line) for line in lines))  # noqa: S308  # nosec B308 B703
+            html.append(format_html("<p>{}</p>", joined))
+    # Every piece above was escaped by format_html or urlize.
+    return mark_safe("\n".join(html))  # noqa: S308  # nosec B308 B703
+
+
+def _linked(line: str) -> str:
+    """Escapes a line, then turns bare web addresses in it into links."""
+    # urlize escapes its input when autoescape is on.
+    return mark_safe(  # noqa: S308  # nosec B308 B703
+        urlize(line, nofollow=True, autoescape=True).replace(
+            'rel="nofollow"', 'rel="nofollow noopener noreferrer"'
+        )
+    )

@@ -69,6 +69,17 @@
             </fieldset>
           {% endif %}
 
+          {% if terms_form %}
+            <fieldset class="form-section terms-consent">
+              <legend class="visually-hidden">Booking terms</legend>
+              {% if terms_form.accept_terms.errors %}{{ terms_form.accept_terms.errors }}{% endif %}
+              <p>
+                <input type="checkbox" name="accept_terms" id="id_accept_terms" required{% if terms_form.accept_terms.value %} checked{% endif %}>
+                <label for="id_accept_terms">I have read and accept the <a href="{% url 'catalog:terms' %}" target="_blank" rel="noopener">booking terms and conditions</a>{% if site_pages.privacy %} and the <a href="{% url 'catalog:privacy' %}" target="_blank" rel="noopener">privacy policy</a>{% endif %}.</label>
+              </p>
+            </fieldset>
+          {% endif %}
+
           <div class="secure-note">
             {% icon "shield" %}
             <span>The next page is Stripe's secure checkout. Your card details go straight to

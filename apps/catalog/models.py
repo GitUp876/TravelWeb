@@ -10,13 +10,13 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
-from apps.core.images import validate_image_upload
+from apps.core.images import LOGO_SIZE, render_png, validate_image_upload, validate_logo_upload
 from apps.core.models import ProcessedImagesMixin, TimeStampedModel
 
 PHOTO_HELP = (
@@ -210,6 +210,125 @@ class SiteImage(ProcessedImagesMixin, TimeStampedModel):
     def placeholder_url(slot: str) -> str:
         name = "hero" if slot == SiteImage.Slot.HOME_HERO else slot
         return static(f"img/placeholders/{name}.svg")
+
+
+TEXT_FORMAT_HELP = (
+    "Plain text. Leave a blank line between paragraphs. Start a line with '## ' for a "
+    "heading, or '- ' for a bullet point. Web addresses become links."
+)
+
+
+class SitePage(TimeStampedModel):
+    """A page of words the business owns: its booking terms, privacy policy
+    and contact details.
+
+    Each page starts life as an unpublished starter draft and is invisible to
+    guests until a Manager has read it, made it their own and ticked
+    Published. The text is plain, never HTML, so nothing typed here can put
+    markup or script on the public site.
+    """
+
+    class Kind(models.TextChoices):
+        TERMS = "terms", "Booking terms and conditions"
+        PRIVACY = "privacy", "Privacy policy"
+        CONTACT = "contact", "Contact us"
+
+    kind = models.CharField(max_length=20, choices=Kind.choices, unique=True)
+    title = models.CharField(max_length=120)
+    body = models.TextField(help_text=TEXT_FORMAT_HELP)
+    is_published = models.BooleanField(
+        "published",
+        default=False,
+        help_text="Tick once the page is accurate for your business. Guests see "
+        "nothing until then.",
+    )
+
+    class Meta:
+        ordering = ["kind"]
+        verbose_name = "site page"
+
+    def __str__(self) -> str:
+        return self.title
+
+    def get_absolute_url(self) -> str:
+        return reverse(f"catalog:{self.kind}")
+
+
+class SiteText(TimeStampedModel):
+    """The business's own logo and the few sentences that carry its voice.
+
+    There is one row, edited in place. Any field left blank falls back to the
+    built-in wording, so the site always reads as finished.
+    """
+
+    IMAGE_FIELD = "logo"
+
+    home_headline = models.CharField(
+        "home page headline",
+        max_length=80,
+        blank=True,
+        help_text="Shown large on the home page banner, e.g. 'Leave the driving to us.'",
+    )
+    home_headline_accent = models.CharField(
+        "headline, second part",
+        max_length=80,
+        blank=True,
+        help_text="Shown after the headline in the accent colour, e.g. 'Enjoy the journey.'",
+    )
+    home_intro = models.TextField(
+        "home page introduction",
+        max_length=400,
+        blank=True,
+        help_text="One or two sentences under the headline.",
+    )
+    footer_about = models.TextField(
+        "about us, in the footer",
+        max_length=400,
+        blank=True,
+        help_text="A sentence or two about the business, shown at the foot of every page.",
+    )
+    logo = models.ImageField(
+        upload_to="brand/",
+        blank=True,
+        validators=[validate_logo_upload],
+        help_text="A square logo or emblem, PNG with a transparent background works best, "
+        "at least 96 pixels across. Shown beside the business name.",
+    )
+
+    class Meta:
+        verbose_name = "site text and logo"
+        verbose_name_plural = "site text and logo"
+
+    def __str__(self) -> str:
+        return "Site text and logo"
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._stored_logo = instance.logo.name if "logo" in field_names else ""
+        return instance
+
+    def save(self, *args, **kwargs):
+        # One row only: a second one saved by accident overwrites the first,
+        # keeping its creation time and tidying away its logo if replaced.
+        if self._state.adding:
+            existing = SiteText.objects.filter(pk=1).values("created_at", "logo").first()
+            if existing:
+                self.created_at = existing["created_at"]
+                self._stored_logo = existing["logo"]
+        self.pk = 1
+        if self.logo and not self.logo._committed:
+            self.logo = render_png(self.logo, LOGO_SIZE)
+        super().save(*args, **kwargs)
+        replaced = getattr(self, "_stored_logo", "")
+        if replaced and replaced != self.logo.name:
+            storage = self.logo.storage
+            transaction.on_commit(lambda: storage.delete(replaced))
+        self._stored_logo = self.logo.name
+
+    @classmethod
+    def current(cls) -> "SiteText | None":
+        return cls.objects.filter(pk=1).first()
 
 
 class PickupPoint(TimeStampedModel):

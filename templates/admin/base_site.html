@@ -10,7 +10,7 @@
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-brand.css' %}"><link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">{% endblock %}
 
 {% block branding %}
-<div id="site-name"><a href="{% url 'admin:index' %}"><img class="admin-mark" src="{% static 'img/logo-mark.svg' %}" alt="" width="32" height="32">{{ site_header|default:_('Django administration') }}</a></div>
+<div id="site-name"><a href="{% url 'admin:index' %}"><img class="admin-mark" src="{% if site_text.logo_url %}{{ site_text.logo_url }}{% else %}{% static 'img/logo-mark.svg' %}{% endif %}" alt="" width="32" height="32">{{ site_header|default:_('Django administration') }}</a></div>
 {% if user.is_anonymous %}
   {% include "admin/color_theme_toggle.html" %}
 {% endif %}

@@ -16,9 +16,10 @@ from django.db import transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.catalog.models import Departure
+from apps.catalog.models import Departure, SitePage
 from apps.core.audit import client_ip
 from apps.payments import checkout, gateway, plans
 
@@ -28,6 +29,7 @@ from .forms import (
     BookingLookupForm,
     LeadGuestForm,
     PaymentOptionForm,
+    TermsConsentForm,
     TravellerForm,
 )
 from .models import Booking
@@ -74,6 +76,8 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
         )
 
     plan_available = departure.payment_plan_available
+    # Once the business has published its terms, a guest must accept them to book.
+    terms_required = SitePage.objects.filter(kind=SitePage.Kind.TERMS, is_published=True).exists()
     prefix_range = range(party)
     if request.method == "POST":
         guest_form = LeadGuestForm(request.POST)
@@ -82,7 +86,10 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             for index in prefix_range
         ]
         payment_form = PaymentOptionForm(request.POST, plan_available=plan_available)
-        if guest_form.is_valid() and all(form.is_valid() for form in traveller_forms):
+        terms_form = TermsConsentForm(request.POST) if terms_required else None
+        forms_valid = [guest_form.is_valid(), terms_form is None or terms_form.is_valid()]
+        forms_valid += [form.is_valid() for form in traveller_forms]
+        if all(forms_valid):
             # Read the choice directly: an unknown value (a stale form for a date
             # that no longer offers a plan) simply means pay in full.
             wants_plan = (
@@ -106,6 +113,9 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             except DepartureNotBookable:
                 messages.error(request, "This date has just closed for booking.")
             else:
+                if terms_form is not None:
+                    booking.terms_accepted_at = timezone.now()
+                    booking.save(update_fields=["terms_accepted_at"])
                 if wants_plan:
                     try:
                         plans.create_plan_for_booking(booking)
@@ -125,6 +135,7 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             TravellerForm(departure=departure, prefix=f"t{index}") for index in prefix_range
         ]
         payment_form = PaymentOptionForm(plan_available=plan_available)
+        terms_form = TermsConsentForm() if terms_required else None
 
     return render(
         request,
@@ -137,6 +148,7 @@ def book_departure(request: HttpRequest, pk: int) -> HttpResponse:
             "guest_form": guest_form,
             "traveller_forms": traveller_forms,
             "payment_form": payment_form,
+            "terms_form": terms_form,
             "plan_available": plan_available,
             "deposit_amount": departure.deposit_amount,
             "final_payment_due_date": departure.final_payment_due_date,
