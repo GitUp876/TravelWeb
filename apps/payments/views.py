@@ -24,6 +24,7 @@ HANDLERS = {
     "checkout.session.expired": services.release_expired_checkout,
     "payment_intent.succeeded": services.record_instalment_payment,
     "payment_intent.payment_failed": services.fail_instalment_payment,
+    "charge.refunded": services.record_refund,
 }
 
 
