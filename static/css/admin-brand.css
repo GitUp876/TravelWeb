@@ -66,7 +66,7 @@ html[data-theme="dark"] {
 
 #header { padding-block: 12px; border-bottom: 3px solid var(--accent); }
 #site-name a { display: inline-flex; align-items: center; gap: 10px; font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.01em; }
-#site-name .admin-mark { width: 32px; height: 32px; }
+#site-name .admin-mark { width: 32px; height: 32px; object-fit: contain; }
 #header #nav-global { display: flex; gap: 6px; margin-left: 24px; margin-right: auto; }
 #header #nav-global a {
   color: #fff; text-decoration: none; font-weight: 700; font-size: .85rem;

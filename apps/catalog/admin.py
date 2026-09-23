@@ -14,6 +14,8 @@ from .models import (
     PickupPoint,
     PriceOption,
     SiteImage,
+    SitePage,
+    SiteText,
     Trip,
     TripImage,
 )
@@ -242,3 +244,47 @@ class SiteImageAdmin(AuditedAdmin):
     @admin.display(description="Current photo")
     def preview(self, obj: SiteImage) -> str:
         return photo_preview(obj.image_card, obj.alt_text)
+
+
+@admin.register(SitePage)
+class SitePageAdmin(AuditedAdmin):
+    """Booking terms, privacy policy and contact page.
+
+    The three pages exist from the start as unpublished starter drafts, so
+    staff edit rather than create them, and none can be deleted.
+    """
+
+    list_display = ("title", "kind", "is_published", "updated_at")
+    fields = ("kind", "title", "body", "is_published")
+    readonly_fields = ("kind",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SiteText)
+class SiteTextAdmin(AuditedAdmin):
+    """The business's logo and its own words on the home page and footer."""
+
+    fields = (
+        "logo_preview",
+        "logo",
+        "home_headline",
+        "home_headline_accent",
+        "home_intro",
+        "footer_about",
+    )
+    readonly_fields = ("logo_preview",)
+
+    @admin.display(description="Current logo")
+    def logo_preview(self, obj: SiteText) -> str:
+        return photo_preview(obj.logo, "Current logo")
+
+    def has_add_permission(self, request):
+        return super().has_add_permission(request) and not SiteText.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

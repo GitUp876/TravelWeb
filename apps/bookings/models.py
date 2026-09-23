@@ -112,6 +112,12 @@ class Booking(TimeStampedModel):
     confirmed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancellation_reason = models.TextField(blank=True)
+    terms_accepted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="When the guest ticked to accept the published booking terms online.",
+    )
     staff_notes = models.TextField(blank=True, help_text="Never shown to the guest.")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

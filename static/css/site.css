@@ -230,7 +230,7 @@ a:hover { color: var(--sea-800); }
   display: inline-flex; align-items: center; gap: .7rem;
   text-decoration: none; color: var(--sea-900); margin-right: auto;
 }
-.brand-mark { width: 2.75rem; height: 2.75rem; }
+.brand-mark { width: 2.75rem; height: 2.75rem; object-fit: contain; }
 .brand-name {
   font-family: var(--font-display); font-weight: 700; font-size: 1.35rem;
   letter-spacing: -.01em; line-height: 1.1;
@@ -565,6 +565,19 @@ a:hover { color: var(--sea-800); }
 .prose { max-width: 44rem; }
 .prose p { margin-bottom: 1.1em; }
 .prose-lead p:first-child { font-size: 1.2rem; color: var(--ink); }
+.prose h2 { font-size: 1.45rem; margin: 2rem 0 .6rem; }
+.prose ul { margin: 0 0 1.1em; padding-left: 1.25rem; display: grid; gap: .35rem; }
+.prose li::marker { color: var(--sun-600); }
+
+/* Terms, privacy and contact pages */
+.site-page { padding-bottom: 4rem; }
+.contact-card { margin-bottom: 2rem; }
+.contact-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; font-size: 1.15rem; font-weight: 600; }
+.contact-card li { display: flex; align-items: center; gap: .6rem; }
+.contact-card .icon { color: var(--sea-600); }
+.footer-legal { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; }
+.footer-legal a { color: inherit; }
+.terms-consent { margin-top: 1.5rem; }
 
 /* Quick facts under a trip title */
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; margin: 0 0 2.5rem; padding: 0; list-style: none; }

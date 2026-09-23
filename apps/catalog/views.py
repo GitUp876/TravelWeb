@@ -1,11 +1,12 @@
 """Guest-facing pages. Read-only in phase 1: browsing, not booking."""
 
+from django.conf import settings
 from django.db.models import Count, Min, Prefetch, Q
 from django.http import Http404
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.views.generic import DetailView, TemplateView
 
-from .models import Departure, PriceOption, Trip, TripCategory
+from .models import Departure, PriceOption, SitePage, Trip, TripCategory
 from .presentation import CATEGORY_DETAILS
 
 
@@ -114,3 +115,22 @@ class DepartureDetailView(DetailView):
         if not departure.trip.is_published or departure.status == Departure.Status.DRAFT:
             raise Http404("No such departure")
         return departure
+
+
+def site_page(request, kind: str):
+    """The booking terms, privacy policy or contact page, once published.
+
+    An unpublished page does not exist as far as guests are concerned: its
+    starter draft is for the business to rewrite, not for anyone to read. The
+    contact page is the exception when the phone or email is set, since those
+    alone are enough to be useful.
+    """
+    page = SitePage.objects.filter(kind=kind, is_published=True).first()
+    is_contact = kind == SitePage.Kind.CONTACT
+    if page is None and not (is_contact and (settings.SITE_PHONE or settings.SITE_EMAIL)):
+        raise Http404("No such page")
+    return render(
+        request,
+        "catalog/site_page.html",
+        {"page": page, "is_contact": is_contact, "title": page.title if page else "Contact us"},
+    )

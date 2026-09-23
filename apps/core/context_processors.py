@@ -6,11 +6,13 @@ from django.http import HttpRequest
 
 def site(request: HttpRequest) -> dict:
     """Site-wide values every template needs, including the category nav."""
-    from apps.catalog.presentation import site_photos
+    from apps.catalog.presentation import published_pages, site_photos, site_text
     from apps.catalog.views import category_summaries
 
     photos = site_photos()
     return {
+        "site_text": site_text(),
+        "site_pages": published_pages(),
         "site_name": settings.SITE_NAME,
         "site_tagline": settings.SITE_TAGLINE,
         "site_phone": settings.SITE_PHONE,

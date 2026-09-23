@@ -29,7 +29,7 @@
   <header class="site-header">
     <div class="wrap header-inner">
       <a class="brand" href="{% url 'catalog:home' %}">
-        <img class="brand-mark" src="{% static 'img/logo-mark.svg' %}" alt="" width="44" height="44">
+        <img class="brand-mark" src="{{ site_text.logo_url }}" alt="" width="44" height="44">
         <span class="brand-name">{{ site_name }}<span class="brand-tag">{{ site_tagline }}</span></span>
       </a>
 
@@ -74,10 +74,10 @@
       <div class="wrap footer-grid">
         <div>
           <a class="brand" href="{% url 'catalog:home' %}">
-            <img class="brand-mark" src="{% static 'img/logo-mark.svg' %}" alt="" width="44" height="44">
+            <img class="brand-mark" src="{{ site_text.logo_url }}" alt="" width="44" height="44">
             <span class="brand-name">{{ site_name }}<span class="brand-tag">{{ site_tagline }}</span></span>
           </a>
-          <p>Day trips, theatre coaches and escorted tours with a friendly tour director, pickups close to home and nothing to organise but your suitcase.</p>
+          <p>{{ site_text.footer_about }}</p>
         </div>
         <div>
           <h2>Explore</h2>
@@ -106,6 +106,13 @@
     </div>
     <div class="wrap footer-bottom">
       <span>&copy; {% now "Y" %} {{ site_name }}</span>
+      {% if site_pages or site_phone or site_email %}
+        <nav class="footer-legal" aria-label="About this site">
+          {% if site_pages.terms %}<a href="{% url 'catalog:terms' %}">{{ site_pages.terms }}</a>{% endif %}
+          {% if site_pages.privacy %}<a href="{% url 'catalog:privacy' %}">{{ site_pages.privacy }}</a>{% endif %}
+          {% if site_pages.contact or site_phone or site_email %}<a href="{% url 'catalog:contact' %}">Contact us</a>{% endif %}
+        </nav>
+      {% endif %}
       <span>{% icon "shield" %} Secure checkout. We never see or store your card.</span>
     </div>
   </footer>

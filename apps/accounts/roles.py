@@ -35,6 +35,8 @@ MANAGER_PERMISSIONS = STAFF_PERMISSIONS + [
     ("catalog", "priceoption", ["add", "change", "delete"]),
     ("catalog", "tripimage", ["add", "change", "delete", "view"]),
     ("catalog", "siteimage", ["add", "change", "delete", "view"]),
+    ("catalog", "sitepage", ["change", "view"]),
+    ("catalog", "sitetext", ["add", "change", "view"]),
     ("catalog", "itineraryday", ["add", "change", "delete", "view"]),
     ("bookings", "booking", ["delete"]),
     ("bookings", "payment", ["add", "change"]),

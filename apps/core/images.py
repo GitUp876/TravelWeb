@@ -40,9 +40,14 @@ CARD_SIZE = 800
 
 JPEG_QUALITY = 82
 
-# Every stored photo is a JPEG this module wrote under a random name, so these
+# A logo is small and square-ish, and keeps its transparency, so it is stored
+# as a PNG rather than a JPEG and needs far fewer pixels than a photo.
+LOGO_MIN_EDGE = 96
+LOGO_SIZE = 512
+
+# Every stored image is one this module wrote under a random name, so these
 # are the only media paths ever served, whatever else ends up on the disk.
-SERVABLE_NAME = re.compile(r"(trips|site)/(cards/)?[0-9a-f]{32}\.jpg")
+SERVABLE_NAME = re.compile(r"(trips|site)/(cards/)?[0-9a-f]{32}\.jpg|brand/[0-9a-f]{32}\.png")
 
 
 def _max_bytes() -> int:
@@ -79,6 +84,15 @@ def validate_image_upload(value) -> None:
     A file that is already stored was checked when it arrived, so only fresh
     uploads are inspected; re-saving a trip does not re-read every image.
     """
+    _validate_upload(value, MIN_WIDTH, MIN_HEIGHT)
+
+
+def validate_logo_upload(value) -> None:
+    """The same checks as a photo, with a logo's much smaller minimum size."""
+    _validate_upload(value, LOGO_MIN_EDGE, LOGO_MIN_EDGE)
+
+
+def _validate_upload(value, min_width: int, min_height: int) -> None:
     if not value or getattr(value, "_committed", True):
         return
     name = (getattr(value, "name", "") or "").lower()
@@ -100,11 +114,11 @@ def validate_image_upload(value) -> None:
             "Upload a JPEG, PNG or WebP photo.",
             code="bad_format",
         )
-    if width < MIN_WIDTH or height < MIN_HEIGHT:
+    if width < min_width or height < min_height:
         raise ValidationError(
-            "That photo is only %(w)s × %(h)s pixels, so it would look blurry. "
+            "That image is only %(w)s × %(h)s pixels, so it would look blurry. "
             "Use one at least %(min_w)s × %(min_h)s.",
-            params={"w": width, "h": height, "min_w": MIN_WIDTH, "min_h": MIN_HEIGHT},
+            params={"w": width, "h": height, "min_w": min_width, "min_h": min_height},
             code="too_small",
         )
 
@@ -134,3 +148,24 @@ def render_jpeg(file, longest_edge: int) -> ContentFile:
         image.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
     file.seek(0)
     return ContentFile(out.getvalue(), name=f"{uuid.uuid4().hex}.jpg")
+
+
+def render_png(file, longest_edge: int) -> ContentFile:
+    """Decodes ``file`` and returns a clean PNG, keeping its transparency.
+
+    For logos, which sit on coloured backgrounds and would show a white box as
+    a JPEG. The same checks and the same rewrite as ``render_jpeg``: the stored
+    bytes are Pillow's own, with no metadata chunks carried across.
+    """
+    fmt, _, _ = _inspect(file)
+    if fmt not in ACCEPTED_FORMATS:
+        raise ValidationError("Upload a JPEG, PNG or WebP image.", code="bad_format")
+    file.seek(0)
+    with Image.open(file) as source:
+        image = ImageOps.exif_transpose(source).convert("RGBA")
+        image.thumbnail((longest_edge, longest_edge), Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        # No pnginfo= or exif= argument: the new file carries no text chunks.
+        image.save(out, format="PNG", optimize=True)
+    file.seek(0)
+    return ContentFile(out.getvalue(), name=f"{uuid.uuid4().hex}.png")
