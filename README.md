@@ -133,8 +133,22 @@ stripe listen --forward-to localhost:8000/stripe/webhook/   # prints whsec_...
 Put that signing secret in `STRIPE_WEBHOOK_SECRET`. In production, add an
 endpoint in the Stripe dashboard for `https://<host>/stripe/webhook/`
 subscribed to `checkout.session.completed`, `checkout.session.expired`,
-`payment_intent.succeeded` and `payment_intent.payment_failed`. The last two
-confirm and reconcile the off-session instalment charges.
+`payment_intent.succeeded`, `payment_intent.payment_failed` and
+`charge.refunded`. The two `payment_intent` events confirm and reconcile the
+off-session instalment charges; `charge.refunded` records refunds.
+
+### Refunds
+
+Refunds are made in the Stripe dashboard, never from this application, so the
+site holds no permission to send money out. When Stripe reports a refund, the
+webhook finds the payment by its payment intent, records a negative "Refund"
+payment for whatever part of the refund is new, and reduces what the booking
+has paid. Stripe reports a running total per charge, so a retried event or two
+partial refunds arriving out of order still record each dollar once.
+
+A refund changes money only. Cancelling the booking or lowering its price is
+still done by a Manager in the admin; a confirmed booking left owing money
+after a refund appears on the payments-due report.
 
 ### Scheduled jobs
 

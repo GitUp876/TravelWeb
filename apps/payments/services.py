@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from apps.bookings.emails import send_booking_confirmation
@@ -257,3 +258,77 @@ def fail_instalment_payment(intent: Any) -> None:
         raise UnknownBooking("payment intent named an instalment we do not hold")
     plans.mark_instalment_failed(sp)
     logger.warning("Instalment %s failed for booking %s", sp.pk, sp.plan.booking.reference)
+
+
+# --- Refunds ---------------------------------------------------------------
+
+
+@transaction.atomic
+def record_refund(charge: Any) -> Booking:
+    """Handles ``charge.refunded``: mirrors a refund made in the Stripe dashboard.
+
+    Refunds are issued in Stripe, not here, so without this a refunded booking
+    would still show the money as paid. Stripe reports the charge's cumulative
+    ``amount_refunded``; the refund rows already recorded against the same
+    payment intent are subtracted from it, and only the difference is written.
+    That makes a retried event, or two partial refunds arriving out of order,
+    record each dollar exactly once. The booking row is locked first, so two
+    deliveries for one booking cannot both see the same running total.
+
+    Nothing else about the booking changes. Whether a refund also cancels the
+    booking or reduces its price is a staff decision; a confirmed booking left
+    owing money after a refund shows on the payments-due report.
+    """
+    intent_id = str(getattr(charge, "payment_intent", "") or "")
+    if not intent_id:
+        raise UnknownBooking("refunded charge carried no payment intent")
+    original = (
+        Payment.objects.filter(stripe_payment_intent_id=intent_id)
+        .exclude(kind=Payment.Kind.REFUND)
+        .order_by("pk")
+        .first()
+    )
+    if original is None:
+        raise UnknownBooking("refunded charge named a payment we do not hold")
+    booking = Booking.objects.select_for_update().get(pk=original.booking_id)
+
+    refunded_total = from_minor_units(getattr(charge, "amount_refunded", None))
+    recorded = -(
+        booking.payments.filter(
+            kind=Payment.Kind.REFUND, stripe_payment_intent_id=intent_id
+        ).aggregate(total=Sum("amount"))["total"]
+        or 0
+    )
+    new_money = refunded_total - recorded
+    if new_money < 0:
+        # Stripe reports less refunded than we hold: a refund failed after we
+        # recorded it. Rare enough to leave to a person rather than guess.
+        logger.error(
+            "Stripe reports less refunded on booking %s than is recorded", booking.reference
+        )
+        return booking
+    if new_money == 0:
+        return booking
+
+    Payment.objects.create(
+        booking=booking,
+        amount=-new_money,
+        kind=Payment.Kind.REFUND,
+        method=Payment.Method.CARD,
+        stripe_payment_intent_id=intent_id,
+        card_brand=original.card_brand,
+        card_last4=original.card_last4,
+    )
+    # A card refund can never exceed what that card paid, but offline payments
+    # share the running total, so floor at zero rather than trip the constraint.
+    booking.amount_paid = max(booking.amount_paid - new_money, 0)
+    booking.save(update_fields=["amount_paid"])
+
+    if booking.status == Booking.Status.CONFIRMED and booking.balance > 0:
+        logger.warning(
+            "Booking %s is still confirmed and now owes %s after a refund",
+            booking.reference,
+            booking.balance,
+        )
+    logger.info("Recorded a %s refund on booking %s", new_money, booking.reference)
+    return booking
