@@ -1,0 +1,26 @@
+{% autoescape off %}{% load humanize %}Here is what needs a Manager's attention on {{ site_name }}.
+{% if digest.failed_plans %}
+PAYMENT PLANS WITH A DECLINED CARD ({{ digest.failed_plans|length }})
+The guest needs to give a new card, or pay the rest another way.
+{% for plan in digest.failed_plans %}  - {{ plan.booking.reference }}: ${{ plan.booking.balance|floatformat:2|intcomma }} still owed
+{% endfor %}{% endif %}{% if digest.overdue %}
+OVERDUE INSTALMENTS ({{ digest.overdue|length }}, ${{ digest.overdue_total|floatformat:2|intcomma }} in total)
+{% for sp in digest.overdue %}  - {{ sp.plan.booking.reference }}: ${{ sp.amount|floatformat:2|intcomma }} due {{ sp.due_date|date:"j M Y" }} ({{ sp.get_status_display|lower }})
+{% endfor %}{% endif %}{% if digest.money_on_dead_bookings %}
+MONEY HELD ON CANCELLED OR EXPIRED BOOKINGS ({{ digest.money_on_dead_bookings|length }})
+Decide whether to refund. Refunds are made in the Stripe dashboard.
+{% for booking in digest.money_on_dead_bookings %}  - {{ booking.reference }} ({{ booking.get_status_display|lower }}): ${{ booking.amount_paid|floatformat:2|intcomma }} paid
+{% endfor %}{% endif %}{% if digest.overpaid %}
+OVERPAID BOOKINGS ({{ digest.overpaid|length }})
+{% for booking in digest.overpaid %}  - {{ booking.reference }}: paid ${{ booking.amount_paid|floatformat:2|intcomma }} against ${{ booking.total_amount|floatformat:2|intcomma }}
+{% endfor %}{% endif %}{% if digest.failed_events %}
+STRIPE NOTIFICATIONS THAT FAILED IN THE LAST DAY ({{ digest.failed_events|length }})
+These are payments Stripe told us about that the site could not match or record. Check the booking in the Stripe dashboard.
+{% for event in digest.failed_events %}  - {{ event.event_type }} at {{ event.received_at|date:"j M Y H:i" }}{% if event.detail %}: {{ event.detail }}{% endif %}
+{% endfor %}{% endif %}{% if not digest.item_count %}
+Nothing needs attention today.
+{% endif %}
+Payments due report: {{ report_url }}
+
+You get this email because you are a Manager on {{ site_name }}. It lists booking references only; open a booking in the staff area to see who it belongs to.
+{% endautoescape %}

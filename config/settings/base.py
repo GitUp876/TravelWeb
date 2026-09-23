@@ -207,8 +207,18 @@ SITE_BASE_URL = (env("SITE_BASE_URL") or "http://127.0.0.1:8000").rstrip("/")
 # this link is the credential: short-lived, single-purpose and re-sendable.
 BOOKING_LINK_MAX_AGE_DAYS = int(env("BOOKING_LINK_MAX_AGE_DAYS", "30"))
 
+# --- Alerts ----------------------------------------------------------------
+# Who hears about errors, as a comma-separated list of addresses. Empty means
+# nobody is emailed and errors only reach the logs.
+
+ADMINS = [("", address) for address in env_list("DJANGO_ADMINS")]
+SERVER_EMAIL = env("DJANGO_SERVER_EMAIL") or DEFAULT_FROM_EMAIL
+EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
+
 # --- Logging ---------------------------------------------------------------
 # Personal data must never reach the logs, so no request bodies are logged.
+# The "django" logger is configured here on purpose: left alone, it keeps
+# Django's default AdminEmailHandler, which would email whole requests.
 
 LOGGING = {
     "version": 1,
@@ -218,9 +228,14 @@ LOGGING = {
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+        "alert_email": {"class": "apps.core.alerts.SafeAdminEmailHandler", "level": "ERROR"},
     },
-    "root": {"handlers": ["console"], "level": env("DJANGO_LOG_LEVEL", "INFO")},
+    "root": {
+        "handlers": ["console", "alert_email"],
+        "level": env("DJANGO_LOG_LEVEL", "INFO"),
+    },
     "loggers": {
+        "django": {"handlers": ["console", "alert_email"], "level": "INFO", "propagate": False},
         "django.security": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "axes": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
